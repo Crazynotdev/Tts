@@ -2,211 +2,253 @@ require('dotenv').config();
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-const QRCode = require('qrcode');
-const rateLimit = require('express-rate-limit');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require('@whiskeysockets/baileys');
-const fs = require('fs').promises;
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const path = require('path');
-const winston = require('winston');
+const fs = require('fs').promises;
 
 // ==================== CONFIGURATION ====================
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 3000;
 
-// Logger pro
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
-    new winston.transports.Console({ format: winston.format.simple() })
-  ]
-});
+// ==================== STOCKAGE DES SESSIONS ====================
+const activeSessions = new Map(); // socketId -> { number, socket, pairingCode, status }
+const userSessions = new Map();   // number -> socketId
 
-// Rate limiting intelligent
-const connectLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // 3 tentatives max
-  message: { error: 'Trop de tentatives, réessayez plus tard' }
-});
-
-// ==================== STOCKAGE EN MÉMOIRE ====================
-const sessions = new Map(); // number -> { socket, qr, status }
-const userIPs = new Map(); // ip -> [numbers]
-
-// ==================== FONCTIONS PRINCIPALES ====================
-
-/**
- * Gère la connexion WhatsApp avec Baileys
- */
-async function connectWhatsApp(number, ip, socketId) {
+// ==================== FONCTION PRINCIPALE DE CONNEXION ====================
+async function createWhatsAppSession(number, socketId) {
+  console.log(`🔗 Création session pour: ${number}`);
+  
   try {
-    const sessionPath = path.join(__dirname, 'sessions', number.replace('+', ''));
+    // Nettoyer le numéro (enlever le +)
+    const cleanNumber = number.replace('+', '');
     
-    // Vérifier limite IP
-    const userNumbers = userIPs.get(ip) || [];
-    if (userNumbers.length >= (process.env.MAX_BOTS_PER_IP || 2)) {
-      throw new Error('Limite de bots atteinte pour votre IP');
-    }
-
-    // Création du socket
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    // Créer le dossier de session
+    const sessionDir = path.join(__dirname, 'sessions', cleanNumber);
+    await fs.mkdir(sessionDir, { recursive: true });
     
+    // Initialiser l'état d'authentification
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    
+    // Créer la socket WhatsApp
     const sock = makeWASocket({
       auth: state,
-      printQRInTerminal: true,
+      printQRInTerminal: false,
+      connectTimeoutMs: 60000,
       browser: ['CRAZY MINI XMD', 'Chrome', '3.0'],
       syncFullHistory: false,
-      generateHighQualityLink: true,
-      markOnlineOnConnect: true,
+      mobile: false,
     });
-
-    // Gestion des événements
+    
+    // Sauvegarder les credentials
     sock.ev.on('creds.update', saveCreds);
     
-    sock.ev.on('connection.update', async (update) => {
-      const session = sessions.get(number) || {};
+    // ============ GÉNÉRATION DU PAIRING CODE ============
+    console.log(`📱 Génération pairing code pour: ${cleanNumber}`);
+    
+    try {
+      // ⭐⭐ C'EST ICI QUE LE PAIRING CODE EST GÉNÉRÉ ⭐⭐
+      const pairingResult = await sock.requestPairingCode(cleanNumber);
+      console.log('✅ Pairing code généré:', pairingResult);
       
-      if (update.qr) {
-        // Générer QR code base64 pour le front
-        const qrBase64 = await QRCode.toDataURL(update.qr);
-        session.qr = qrBase64;
-        session.status = 'qr_pending';
-        sessions.set(number, session);
-        
-        io.to(socketId).emit('qr_update', {
-          qr: qrBase64,
-          pairingCode: update.pairingCode,
-          number
-        });
-      }
+      const pairingCode = pairingResult.code;
+      const formattedCode = pairingCode.match(/.{1,3}/g)?.join(' ') || pairingCode;
+      
+      // Stocker la session
+      activeSessions.set(socketId, {
+        number,
+        socket: sock,
+        pairingCode: formattedCode,
+        rawCode: pairingCode,
+        status: 'awaiting_pairing',
+        createdAt: new Date(),
+        socketId
+      });
+      
+      userSessions.set(number, socketId);
+      
+      // Envoyer le code au front via Socket.IO
+      io.to(socketId).emit('pairing_code', {
+        success: true,
+        number,
+        code: formattedCode,
+        rawCode: pairingCode,
+        message: 'Utilisez ce code dans WhatsApp > Appareils connectés'
+      });
+      
+      console.log(`📤 Code envoyé au client: ${formattedCode}`);
+      
+    } catch (pairingError) {
+      console.error('❌ Erreur requestPairingCode:', pairingError);
+      io.to(socketId).emit('pairing_error', {
+        error: 'Impossible de générer le code. Vérifiez le numéro.'
+      });
+      throw pairingError;
+    }
+    
+    // ============ GESTION DES ÉVÉNEMENTS DE CONNEXION ============
+    sock.ev.on('connection.update', async (update) => {
+      console.log('📡 Update connexion:', update.connection);
       
       if (update.connection === 'open') {
-        logger.info(`✅ Bot connecté: ${number}`);
-        session.status = 'connected';
-        session.connectedAt = new Date();
-        sessions.set(number, session);
+        console.log(`✅ Connexion réussie pour: ${number}`);
         
-        userIPs.set(ip, [...new Set([...userNumbers, number])]);
+        const session = activeSessions.get(socketId);
+        if (session) {
+          session.status = 'connected';
+          session.connectedAt = new Date();
+          activeSessions.set(socketId, session);
+        }
         
+        // Notifier le front
         io.to(socketId).emit('connection_success', {
+          success: true,
           number,
-          message: 'Bot connecté avec succès!'
+          message: '✅ Bot WhatsApp connecté avec succès!',
+          timestamp: new Date().toISOString()
         });
-
+        
         // Initialiser le handler de messages
-        initMessageHandler(sock, number);
+        setupMessageHandler(sock, number);
       }
       
       if (update.connection === 'close') {
-        const reason = update.lastDisconnect?.error?.output?.statusCode;
-        logger.warn(`❌ Déconnexion ${number}: ${reason || 'Unknown'}`);
+        console.log(`❌ Déconnexion: ${number}`);
         
-        if (reason === DisconnectReason.loggedOut) {
-          // Supprimer la session
-          sessions.delete(number);
-          try {
-            await fs.rm(sessionPath, { recursive: true });
-          } catch (e) {}
+        const session = activeSessions.get(socketId);
+        if (session) {
+          // Si déconnecté manuellement de WhatsApp
+          if (update.lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+            // Supprimer les fichiers de session
+            try {
+              await fs.rm(sessionDir, { recursive: true });
+            } catch (e) {}
+          }
         }
         
-        io.to(socketId).emit('connection_lost', { number, reason });
+        activeSessions.delete(socketId);
+        userSessions.delete(number);
+        
+        io.to(socketId).emit('connection_closed', {
+          number,
+          message: 'Déconnecté de WhatsApp'
+        });
       }
     });
-
-    sock.ev.on('messages.upsert', ({ messages }) => {
-      handleIncomingMessage(sock, messages[0], number);
-    });
-
-    // Stocker la session
-    sessions.set(number, { socket: sock, ip, socketId });
+    
+    // Timeout après 2 minutes
+    setTimeout(() => {
+      const session = activeSessions.get(socketId);
+      if (session && session.status === 'awaiting_pairing') {
+        console.log(`⏱️ Timeout pairing pour ${number}`);
+        
+        io.to(socketId).emit('pairing_timeout', {
+          number,
+          message: 'Code expiré. Veuillez réessayer.'
+        });
+        
+        sock.logout();
+        activeSessions.delete(socketId);
+        userSessions.delete(number);
+      }
+    }, 120000); // 2 minutes
+    
+    return true;
     
   } catch (error) {
-    logger.error(`Erreur connexion ${number}:`, error);
-    throw error;
+    console.error('❌ Erreur création session:', error);
+    io.to(socketId).emit('connection_error', {
+      error: error.message || 'Erreur lors de la création de la session'
+    });
+    return false;
   }
 }
 
-/**
- * Gère les messages entrants
- */
-function handleIncomingMessage(sock, msg, botNumber) {
-  if (!msg.message || msg.key.fromMe) return;
-  
-  const text = msg.message.conversation || 
-               msg.message.extendedTextMessage?.text || 
-               msg.message.imageMessage?.caption || '';
-  
-  // Loguer le message
-  logger.info(`📥 ${botNumber} reçoit: ${text.substring(0, 50)}...`);
-  
-  // Vérifier préfixe
-  if (text.startsWith('.')) {
-    const command = text.slice(1).split(' ')[0].toLowerCase();
-    const args = text.slice(command.length + 2).trim();
-    
-    // Commandes intégrées
-    switch(command) {
-      case 'ping':
-        sock.sendMessage(msg.key.remoteJid, { 
-          text: `🏓 Pong! *CRAZY MINI XMD* est opérationnel` 
-        });
-        break;
-        
-      case 'menu':
-        const menu = `🤖 *CRAZY MINI XMD*\n
-📍 Commandes disponibles:
-• .ping - Test de réponse
-• .menu - Ce menu
-• .info - Infos du bot
-• .time - Heure actuelle
-• .owner - Contact admin
-
-📡 Status: Connecté`;
-        sock.sendMessage(msg.key.remoteJid, { text: menu });
-        break;
-        
-      case 'info':
-        sock.sendMessage(msg.key.remoteJid, { 
-          text: `*🤖 CRAZY MINI XMD*\nVersion: 2.0\nHébergement: Serveur Cloud\nStatut: ✅ Actif\nAdmin: ${process.env.ADMIN_PHONE || 'Non configuré'}` 
-        });
-        break;
-        
-      case 'owner':
-        sock.sendMessage(msg.key.remoteJid, { 
-          text: `👨‍💻 *Contact Admin*\nPour support: ${process.env.ADMIN_PHONE || 'Non configuré'}\nProjet: CRAZY MINI XMD SaaS` 
-        });
-        break;
-        
-      default:
-        sock.sendMessage(msg.key.remoteJid, { 
-          text: `❌ Commande inconnue. Tapez *.menu* pour la liste.` 
-        });
-    }
-  }
-  
-  // Envoyer webhook si configuré
-  if (process.env.WEBHOOK_URL) {
-    fetch(process.env.WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ botNumber, message: msg })
-    }).catch(() => {});
-  }
-}
-
-/**
- * Initialise le handler de messages
- */
-function initMessageHandler(sock, number) {
+// ==================== GESTION DES MESSAGES ====================
+function setupMessageHandler(sock, botNumber) {
   sock.ev.on('messages.upsert', ({ messages }) => {
-    handleIncomingMessage(sock, messages[0], number);
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
+    
+    const text = msg.message.conversation || 
+                 msg.message.extendedTextMessage?.text || 
+                 msg.message.imageMessage?.caption || '';
+    
+    console.log(`📥 Message reçu de ${botNumber}: ${text.substring(0, 50)}`);
+    
+    // Commandes du bot
+    if (text.startsWith('.')) {
+      const command = text.slice(1).split(' ')[0].toLowerCase();
+      
+      switch(command) {
+        case 'ping':
+          sock.sendMessage(msg.key.remoteJid, { 
+            text: '🏓 Pong! *CRAZY MINI XMD* est en ligne!' 
+          });
+          break;
+          
+        case 'menu':
+          const menu = `🤖 *CRAZY MINI XMD*\n\n` +
+                      `📋 **Commandes disponibles:**\n` +
+                      `• .ping - Test de réponse\n` +
+                      `• .menu - Affiche ce menu\n` +
+                      `• .info - Informations du bot\n` +
+                      `• .time - Heure actuelle\n` +
+                      `• .owner - Contact administrateur\n\n` +
+                      `⚡ **Statut:** Connecté ✅\n` +
+                      `🌐 **Hébergement:** Serveur Cloud`;
+          sock.sendMessage(msg.key.remoteJid, { text: menu });
+          break;
+          
+        case 'info':
+          const info = `*🤖 CRAZY MINI XMD*\n\n` +
+                      `📱 **Version:** 2.0 Pro\n` +
+                      `🔧 **Statut:** Actif\n` +
+                      `🌍 **Hébergement:** Serveur 24/7\n` +
+                      `🛡️ **Sécurité:** Session chiffrée\n` +
+                      `⚡ **Latence:** < 500ms`;
+          sock.sendMessage(msg.key.remoteJid, { text: info });
+          break;
+          
+        case 'time':
+          const now = new Date();
+          const timeStr = now.toLocaleString('fr-FR', {
+            timeZone: 'Africa/Libreville',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+          sock.sendMessage(msg.key.remoteJid, { 
+            text: `🕐 Heure actuelle (Gabon):\n*${timeStr}*` 
+          });
+          break;
+          
+        case 'owner':
+          sock.sendMessage(msg.key.remoteJid, { 
+            text: `👨‍💻 **Administrateur CRAZY MINI XMD**\n\n` +
+                  `Pour support ou questions:\n` +
+                  `📞 Contact: +241 XX XX XX XX\n` +
+                  `📧 Email: admin@crazyminixmd.com\n` +
+                  `🌐 Site: crazyminixmd.com` 
+          });
+          break;
+          
+        default:
+          sock.sendMessage(msg.key.remoteJid, { 
+            text: `❌ Commande inconnue\n\n` +
+                  `Tapez *.menu* pour voir les commandes disponibles.` 
+          });
+      }
+    }
   });
 }
 
@@ -214,123 +256,163 @@ function initMessageHandler(sock, number) {
 app.use(express.json());
 app.use(express.static('public'));
 
-// Page d'accueil
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// API de connexion
-app.post('/api/connect', connectLimiter, async (req, res) => {
+// Route pour démarrer la connexion
+app.post('/api/connect', async (req, res) => {
   try {
     const { number } = req.body;
-    const ip = req.ip;
     
+    // Validation du numéro
     if (!number || !number.match(/^\+[1-9]\d{1,14}$/)) {
-      return res.status(400).json({ error: 'Numéro WhatsApp invalide' });
-    }
-    
-    if (sessions.has(number) && sessions.get(number).status === 'connected') {
-      return res.json({ 
-        warning: 'Bot déjà connecté', 
-        qr: null,
-        pairingCode: null 
+      return res.status(400).json({ 
+        success: false,
+        error: 'Format de numéro invalide. Utilisez: +24105730123' 
       });
     }
     
-    // Générer un ID unique pour le socket
+    // Vérifier si déjà connecté
+    if (userSessions.has(number)) {
+      const existingSocketId = userSessions.get(number);
+      const session = activeSessions.get(existingSocketId);
+      
+      if (session && session.status === 'connected') {
+        return res.json({
+          success: true,
+          alreadyConnected: true,
+          message: 'Ce numéro est déjà connecté'
+        });
+      }
+    }
+    
+    // Générer un ID de socket unique
     const socketId = `socket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Démarrer la connexion en arrière-plan
-    connectWhatsApp(number, ip, socketId).catch(logger.error);
+    setTimeout(async () => {
+      await createWhatsAppSession(number, socketId);
+    }, 100);
     
     res.json({ 
       success: true, 
       socketId,
-      message: 'Connexion en cours, scannez le QR qui apparaîtra' 
+      message: 'Génération du code de connexion...' 
     });
     
   } catch (error) {
-    logger.error('Erreur API connect:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Erreur /api/connect:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Erreur serveur. Veuillez réessayer.' 
+    });
   }
 });
 
-// API de statut
-app.get('/api/status/:number', (req, res) => {
-  const session = sessions.get(req.params.number);
-  res.json({ 
-    status: session?.status || 'disconnected',
-    connectedAt: session?.connectedAt,
-    ip: session?.ip 
+// Route pour vérifier le statut
+app.get('/api/status', (req, res) => {
+  const connectedBots = Array.from(activeSessions.values())
+    .filter(session => session.status === 'connected')
+    .length;
+  
+  res.json({
+    active: connectedBots,
+    total: activeSessions.size,
+    uptime: process.uptime()
   });
 });
 
-// API de déconnexion
-app.delete('/api/disconnect/:number', async (req, res) => {
-  const number = req.params.number;
-  const session = sessions.get(number);
+// Route pour déconnecter
+app.delete('/api/disconnect/:socketId', async (req, res) => {
+  const socketId = req.params.socketId;
+  const session = activeSessions.get(socketId);
   
-  if (session?.socket) {
-    await session.socket.logout();
-    sessions.delete(number);
-    logger.info(`🔒 Bot déconnecté: ${number}`);
+  if (session) {
+    try {
+      if (session.socket) {
+        await session.socket.logout();
+      }
+      
+      activeSessions.delete(socketId);
+      if (session.number) {
+        userSessions.delete(session.number);
+      }
+      
+      console.log(`🔒 Session déconnectée: ${socketId}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Déconnecté avec succès' 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Erreur lors de la déconnexion' 
+      });
+    }
+  } else {
+    res.status(404).json({ 
+      success: false, 
+      error: 'Session non trouvée' 
+    });
   }
-  
-  res.json({ success: true, message: 'Bot déconnecté' });
 });
 
-// ==================== WEBSOCKETS ====================
+// ==================== WEBSOCKET (Socket.IO) ====================
 io.on('connection', (socket) => {
-  logger.info(`🔌 Nouveau client Socket.IO: ${socket.id}`);
+  console.log(`🔌 Nouveau client connecté: ${socket.id}`);
   
   socket.on('join_session', (socketId) => {
     socket.join(socketId);
+    console.log(`📡 Client ${socket.id} rejoint session: ${socketId}`);
+  });
+  
+  socket.on('leave_session', (socketId) => {
+    socket.leave(socketId);
   });
   
   socket.on('disconnect', () => {
-    // Nettoyer les sessions orphelines
-    for (const [number, session] of sessions.entries()) {
-      if (session.socketId === socket.id) {
-        logger.info(`🧹 Nettoyage session orpheline: ${number}`);
-        sessions.delete(number);
-      }
-    }
+    console.log(`👋 Client déconnecté: ${socket.id}`);
   });
 });
 
-// ==================== DÉMARRAGE ====================
+// ==================== DÉMARRAGE DU SERVEUR ====================
 async function startServer() {
-  // Créer les dossiers nécessaires
-  await fs.mkdir(path.join(__dirname, 'sessions'), { recursive: true });
-  await fs.mkdir(path.join(__dirname, 'logs'), { recursive: true });
-  
-  httpServer.listen(PORT, () => {
-    logger.info(`
-    🚀 CRAZY MINI XMD DÉMARRÉ
-    ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-    █ Port: ${PORT}
-    █ Mode: ${process.env.NODE_ENV}
-    █ Sessions actives: ${sessions.size}
-    █ Admin: ${process.env.ADMIN_PHONE || 'Non configuré'}
-    █ Max par IP: ${process.env.MAX_BOTS_PER_IP || 2}
-    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-    `);
-  });
+  try {
+    // Créer les dossiers nécessaires
+    await fs.mkdir(path.join(__dirname, 'sessions'), { recursive: true });
+    await fs.mkdir(path.join(__dirname, 'public'), { recursive: true });
+    
+    httpServer.listen(PORT, () => {
+      console.log(`
+      🚀 CRAZY MINI XMD DÉMARRÉ !
+      ==============================
+      🌐 Port: ${PORT}
+      📱 Mode: Pairing Code Only
+      🔧 Sessions: ${activeSessions.size}
+      ⚡ Prêt à recevoir des connexions...
+      ==============================
+      `);
+    });
+  } catch (error) {
+    console.error('❌ Erreur démarrage serveur:', error);
+    process.exit(1);
+  }
 }
 
-// Gestion propre des arrêts
+// Gestion propre de l'arrêt
 process.on('SIGINT', async () => {
-  logger.info('🛑 Arrêt en cours...');
+  console.log('🛑 Arrêt en cours...');
   
-  // Déconnecter tous les bots proprement
-  for (const [number, session] of sessions.entries()) {
+  // Déconnecter toutes les sessions
+  for (const [socketId, session] of activeSessions.entries()) {
     if (session.socket) {
-      await session.socket.logout().catch(() => {});
+      try {
+        await session.socket.logout();
+      } catch (e) {}
     }
   }
   
+  console.log('✅ Toutes sessions fermées');
   process.exit(0);
 });
 
 // Démarrer le serveur
-startServer().catch(console.error);
+startServer();
