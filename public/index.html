@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRAZY MINI XMD | Bot WhatsApp Instantané</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --danger: #ef4444;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --gray: #64748b;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: linear-gradient(135deg, var(--dark) 0%, #1e293b 100%);
+            color: var(--light);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .header {
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            padding: 25px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1%, transparent 1%);
+            background-size: 20px 20px;
+            animation: float 20s linear infinite;
+        }
+        
+        @keyframes float {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .logo-icon {
+            background: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--primary);
+        }
+        
+        .logo-text h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        
+        .logo-text p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .main {
+            padding: 40px 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .card h2 {
+            margin-bottom: 25px;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            color: var(--primary);
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 600px) {
+            .input-group { flex-direction: column; }
+        }
+        
+        input {
+            flex: 1;
+            padding: 16px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        button {
+            padding: 16px 32px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .qr-container {
+            margin-top: 40px;
+            text-align: center;
+            display: none;
+        }
+        
+        .qr-container.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .qr-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin: 20px 0;
+        }
+        
+        .qr-box img {
+            max-width: 300px;
+            height: auto;
+            border-radius: 8px;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .status.success {
+            border-left-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+        
+        .status.error {
+            border-left-color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+        
+        .code-pairing {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 20px;
+            letter-spacing: 3px;
+            margin: 15px 0;
+            display: inline-block;
+        }
+        
+        .instructions {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+            line-height: 1.8;
+            opacity: 0.9;
+        }
+        
+        .footer {
+            padding: 20px 30px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 14px;
+            opacity: 0.7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        @media (max-width: 600px) {
+            .footer { flex-direction: column; gap: 10px; }
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>CRAZY MINI XMD</h1>
+                    <p>Bot WhatsApp instantané • Hébergé serveur • Zero config</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main">
+            <div class="card">
+                <h2><i class="fas fa-bolt"></i> Connectez votre bot en 30 secondes</h2>
+                
+                <div class="input-group">
+                    <input 
+                        type="tel" 
+                        id="whatsappNumber" 
+                        placeholder="Ex: +33612345678" 
+                        pattern="^\+[1-9]\d{1,14}$"
+                    >
+                    <button id="connectBtn" onclick="connectBot()">
+                        <i class="fas fa-plug"></i> Connecter le bot
+                    </button>
+                </div>
+                
+                <div id="statusMessage" class="status"></div>
+                
+                <div id="qrSection" class="qr-container">
+                    <h3><i class="fas fa-qrcode"></i> Scannez ce QR Code</h3>
+                    <p>Ouvrez WhatsApp → Paramètres → Appareils connectés → Connecter un appareil</p>
+                    
+                    <div class="qr-box">
+                        <img id="qrImage" src="" alt="QR Code">
+                    </div>
+                    
+                    <p>Ou utilisez le code pairing :</p>
+                    <div class="code-pairing" id="pairingCode">--- --- ---</div>
+                    
+                    <p style="margin-top: 20px; opacity: 0.8;">
+                        <i class="fas fa-clock"></i> Valable 30 secondes • Actualise automatiquement
+                    </p>
+                    
+                    <div style="margin-top: 25px;">
+                        <button class="secondary" onclick="cancelConnection()">
+                            <i class="fas fa-times"></i> Annuler
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="instructions">
+                    <h3><i class="fas fa-graduation-cap"></i> Comment ça marche</h3>
+                    <ol>
+                        <li>Entrez votre numéro WhatsApp avec l'indicatif pays (ex: +33)</li>
+                        <li>Scannez le QR code avec votre téléphone</li>
+                        <li>Votre bot est actif ! Utilisez <code>.menu</code> pour voir les commandes</li>
+                        <li>Le bot reste connecté 24h/24 sur notre serveur</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div>
+                <i class="fas fa-shield-alt"></i> Sécurisé • 1 session par numéro • Chiffré
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="activeBots">0</div>
+                    <div>Bots actifs</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="uptime">100%</div>
+                    <div>Uptime</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+        let currentSocketId = null;
+        
+        // Initialiser Socket.IO
+        function initSocket() {
+            socket = io();
+            
+            socket.on('qr_update', (data) => {
+                document.getElementById('qrImage').src = data.qr;
+                document.getElementById('pairingCode').textContent = data.pairingCode || '--- --- ---';
+                document.getElementById('qrSection').classList.add('active');
+                
+                showStatus(`QR Code généré pour ${data.number}`, 'success');
+            });
+            
+            socket.on('connection_success', (data) => {
+                showStatus(`✅ ${data.message} Bot connecté avec le numéro ${data.number}`, 'success');
+                document.getElementById('qrSection').classList.remove('active');
+                updateActiveBots();
+            });
+            
+            socket.on('connection_lost', (data) => {
+                showStatus(`⚠️ Connexion perdue: ${data.reason || 'Raison inconnue'}`, 'error');
+            });
+        }
+        
+        // Connecter le bot
+        async function connectBot() {
+            const number = document.getElementById('whatsappNumber').value.trim();
+            const btn = document.getElementById('connectBtn');
+            
+            if (!number.match(/^\+[1-9]\d{1,14}$/)) {
+                showStatus('❌ Format invalide. Utilisez: +33612345678', 'error');
+                return;
+            }
+            
+            btn.innerHTML = '<span class="spinner"></span> Connexion...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showStatus(`❌ ${data.error}`, 'error');
+                } else {
+                    currentSocketId = data.socketId;
+                    socket.emit('join_session', currentSocketId);
+                    showStatus(data.message, 'success');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur réseau', 'error');
+            } finally {
+                btn.innerHTML = '<i class="fas fa-plug"></i> Connecter le bot';
+                btn.disabled = false;
+            }
+        }
+        
+        // Annuler la connexion
+        function cancelConnection() {
+            if (currentSocketId) {
+                socket.emit('leave_session', currentSocketId);
+            }
+            document.getElementById('qrSection').classList.remove('active');
+            showStatus('Connexion annulée', 'error');
+        }
+        
+        // Afficher un message de statut
+        function showStatus(message, type = '') {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status';
+            if (type) statusDiv.classList.add(type);
+            
+            if (type === 'error') {
+                setTimeout(() => statusDiv.textContent = '', 5000);
+            }
+        }
+        
+        // Mettre à jour les stats
+        async function updateActiveBots() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                document.getElementById('activeBots').textContent = data.active || 0;
+            } catch (error) {
+                console.error('Erreur stats:', error);
+            }
+        }
+        
+        // Au chargement
+        document.addEventListener('DOMContentLoaded', () => {
+            initSocket();
+            updateActiveBots();
+            setInterval(updateActiveBots, 30000);
+            
+            // Auto-focus sur l'input
+            document.getElementById('whatsappNumber').focus();
+            
+            // Entrée = connexion
+            document.getElementById('whatsappNumber').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') connectBot();
+            });
+        });
+    </script>
+</body>
+</html>
