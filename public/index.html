@@ -11,9 +11,9 @@
             --primary-dark: #4f46e5;
             --success: #10b981;
             --danger: #ef4444;
+            --warning: #f59e0b;
             --dark: #0f172a;
             --light: #f8fafc;
-            --gray: #64748b;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -183,13 +183,14 @@
             background: rgba(255, 255, 255, 0.15);
         }
         
-        .qr-container {
+        /* Section Pairing Code */
+        .pairing-container {
             margin-top: 40px;
             text-align: center;
             display: none;
         }
         
-        .qr-container.active {
+        .pairing-container.active {
             display: block;
             animation: fadeIn 0.5s;
         }
@@ -199,62 +200,190 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        .qr-box {
-            background: white;
+        .pairing-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .pairing-header i {
+            color: var(--primary);
+            font-size: 24px;
+        }
+        
+        .pairing-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1));
+            padding: 40px 30px;
+            border-radius: 16px;
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            margin: 25px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pairing-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 255, 255, 0.03) 2px,
+                rgba(255, 255, 255, 0.03) 4px
+            );
+        }
+        
+        .pairing-number {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+        
+        .pairing-code {
+            font-family: 'Courier New', monospace;
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: 15px;
+            color: white;
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            margin: 25px 0;
             padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
             border-radius: 12px;
-            display: inline-block;
-            margin: 20px 0;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            animation: pulse 2s infinite;
         }
         
-        .qr-box img {
-            max-width: 300px;
-            height: auto;
-            border-radius: 8px;
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
         }
         
-        .status {
-            padding: 15px;
-            border-radius: 10px;
+        .code-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
             margin-top: 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border-left: 4px solid var(--primary);
+        }
+        
+        .copy-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #0da271;
+            transform: translateY(-2px);
+        }
+        
+        .timer {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+        
+        .timer i {
+            color: var(--warning);
+        }
+        
+        .countdown {
+            font-weight: bold;
+            color: var(--warning);
+        }
+        
+        /* Status Messages */
+        .status {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            display: none;
         }
         
         .status.success {
-            border-left-color: var(--success);
+            display: block;
             background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid var(--success);
+            color: #a7f3d0;
         }
         
         .status.error {
-            border-left-color: var(--danger);
+            display: block;
             background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--danger);
+            color: #fca5a5;
         }
         
-        .code-pairing {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            font-family: monospace;
-            font-size: 20px;
-            letter-spacing: 3px;
-            margin: 15px 0;
-            display: inline-block;
+        .status.info {
+            display: block;
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--primary);
+            color: #c7d2fe;
         }
         
+        /* Instructions */
         .instructions {
-            margin-top: 30px;
-            padding-top: 20px;
+            margin-top: 40px;
+            padding-top: 25px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        .instructions ol {
-            margin-left: 20px;
-            margin-top: 10px;
-            line-height: 1.8;
-            opacity: 0.9;
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 25px 0;
+            flex-wrap: wrap;
+            gap: 15px;
         }
         
+        .step {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .step-desc {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+        
+        /* Footer */
         .footer {
             padding: 20px 30px;
             text-align: center;
@@ -268,6 +397,7 @@
         
         @media (max-width: 600px) {
             .footer { flex-direction: column; gap: 10px; }
+            .steps { flex-direction: column; }
         }
         
         .stats {
@@ -285,14 +415,14 @@
             color: var(--primary);
         }
         
+        /* Spinner */
         .spinner {
             border: 3px solid rgba(255, 255, 255, 0.1);
             border-top: 3px solid var(--primary);
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             animation: spin 1s linear infinite;
-            display: inline-block;
         }
         
         @keyframes spin {
@@ -317,14 +447,15 @@
         
         <div class="main">
             <div class="card">
-                <h2><i class="fas fa-bolt"></i> Connectez votre bot en 30 secondes</h2>
+                <h2><i class="fas fa-bolt"></i> Connectez votre bot WhatsApp</h2>
                 
                 <div class="input-group">
                     <input 
                         type="tel" 
                         id="whatsappNumber" 
-                        placeholder="Ex: +33612345678" 
+                        placeholder="Ex: +24105730123" 
                         pattern="^\+[1-9]\d{1,14}$"
+                        value="+24105730123"
                     >
                     <button id="connectBtn" onclick="connectBot()">
                         <i class="fas fa-plug"></i> Connecter le bot
@@ -333,36 +464,74 @@
                 
                 <div id="statusMessage" class="status"></div>
                 
-                <div id="qrSection" class="qr-container">
-                    <h3><i class="fas fa-qrcode"></i> Scannez ce QR Code</h3>
-                    <p>Ouvrez WhatsApp → Paramètres → Appareils connectés → Connecter un appareil</p>
-                    
-                    <div class="qr-box">
-                        <img id="qrImage" src="" alt="QR Code">
+                <!-- Section Pairing Code -->
+                <div id="pairingSection" class="pairing-container">
+                    <div class="pairing-header">
+                        <i class="fas fa-key"></i>
+                        <h3>Code de connexion WhatsApp</h3>
                     </div>
                     
-                    <p>Ou utilisez le code pairing :</p>
-                    <div class="code-pairing" id="pairingCode">--- --- ---</div>
+                    <div class="pairing-number" id="pairingNumber">
+                        Numéro: <span id="displayNumber"></span>
+                    </div>
                     
-                    <p style="margin-top: 20px; opacity: 0.8;">
-                        <i class="fas fa-clock"></i> Valable 30 secondes • Actualise automatiquement
-                    </p>
+                    <div class="pairing-box">
+                        <p style="margin-bottom: 15px; opacity: 0.9;">
+                            <i class="fas fa-mobile-alt"></i> Entrez ce code dans WhatsApp :
+                        </p>
+                        
+                        <div class="pairing-code" id="pairingCodeDisplay">
+                            --- --- ---
+                        </div>
+                        
+                        <div class="code-actions">
+                            <button class="copy-btn" onclick="copyPairingCode()">
+                                <i class="fas fa-copy"></i> Copier le code
+                            </button>
+                            <button class="secondary" onclick="cancelConnection()">
+                                <i class="fas fa-times"></i> Annuler
+                            </button>
+                        </div>
+                    </div>
                     
-                    <div style="margin-top: 25px;">
-                        <button class="secondary" onclick="cancelConnection()">
-                            <i class="fas fa-times"></i> Annuler
-                        </button>
+                    <div class="timer">
+                        <i class="fas fa-clock"></i> Code valable pendant : 
+                        <span class="countdown" id="countdown">120</span> secondes
                     </div>
                 </div>
                 
                 <div class="instructions">
-                    <h3><i class="fas fa-graduation-cap"></i> Comment ça marche</h3>
-                    <ol>
-                        <li>Entrez votre numéro WhatsApp avec l'indicatif pays (ex: +33)</li>
-                        <li>Scannez le QR code avec votre téléphone</li>
-                        <li>Votre bot est actif ! Utilisez <code>.menu</code> pour voir les commandes</li>
-                        <li>Le bot reste connecté 24h/24 sur notre serveur</li>
-                    </ol>
+                    <h3><i class="fas fa-graduation-cap"></i> Instructions de connexion</h3>
+                    
+                    <div class="steps">
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div class="step-title">Entrez votre numéro</div>
+                            <div class="step-desc">Avec l'indicatif pays (+241, +33, etc.)</div>
+                        </div>
+                        
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div class="step-title">Générez le code</div>
+                            <div class="step-desc">Cliquez sur "Connecter le bot"</div>
+                        </div>
+                        
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div class="step-title">Ouvrez WhatsApp</div>
+                            <div class="step-desc">Paramètres → Appareils connectés</div>
+                        </div>
+                        
+                        <div class="step">
+                            <div class="step-number">4</div>
+                            <div class="step-title">Saisissez le code</div>
+                            <div class="step-desc">Quand WhatsApp le demande</div>
+                        </div>
+                    </div>
+                    
+                    <p style="text-align: center; margin-top: 20px; opacity: 0.8; font-size: 14px;">
+                        <i class="fas fa-info-circle"></i> Une fois connecté, utilisez la commande <code>.menu</code> dans WhatsApp pour voir les options disponibles.
+                    </p>
                 </div>
             </div>
         </div>
@@ -377,8 +546,8 @@
                     <div>Bots actifs</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" id="uptime">100%</div>
-                    <div>Uptime</div>
+                    <div class="stat-value">24/7</div>
+                    <div>Disponibilité</div>
                 </div>
             </div>
         </div>
@@ -388,41 +557,116 @@
     <script>
         let socket = null;
         let currentSocketId = null;
+        let countdownInterval = null;
+        let currentPairingCode = null;
         
         // Initialiser Socket.IO
         function initSocket() {
             socket = io();
             
-            socket.on('qr_update', (data) => {
-                document.getElementById('qrImage').src = data.qr;
-                document.getElementById('pairingCode').textContent = data.pairingCode || '--- --- ---';
-                document.getElementById('qrSection').classList.add('active');
+            // Code pairing reçu
+            socket.on('pairing_code', (data) => {
+                console.log('📱 Pairing code reçu:', data);
                 
-                showStatus(`QR Code généré pour ${data.number}`, 'success');
+                if (data.success) {
+                    // Afficher le numéro
+                    document.getElementById('displayNumber').textContent = data.number;
+                    
+                    // Afficher le code formaté
+                    currentPairingCode = data.rawCode;
+                    document.getElementById('pairingCodeDisplay').textContent = data.code;
+                    
+                    // Afficher la section
+                    document.getElementById('pairingSection').classList.add('active');
+                    
+                    // Message de succès
+                    showStatus(`✅ Code généré pour ${data.number}`, 'success');
+                    
+                    // Démarrer le compte à rebours (2 minutes)
+                    startCountdown(120);
+                }
             });
             
+            // Connexion réussie
             socket.on('connection_success', (data) => {
-                showStatus(`✅ ${data.message} Bot connecté avec le numéro ${data.number}`, 'success');
-                document.getElementById('qrSection').classList.remove('active');
+                showStatus(`✅ ${data.message}`, 'success');
+                document.getElementById('pairingSection').classList.remove('active');
+                clearInterval(countdownInterval);
                 updateActiveBots();
             });
             
-            socket.on('connection_lost', (data) => {
-                showStatus(`⚠️ Connexion perdue: ${data.reason || 'Raison inconnue'}`, 'error');
+            // Timeout du code
+            socket.on('pairing_timeout', (data) => {
+                showStatus('⏱️ Code expiré. Veuillez réessayer.', 'error');
+                document.getElementById('pairingSection').classList.remove('active');
+                clearInterval(countdownInterval);
             });
+            
+            // Erreur
+            socket.on('connection_error', (data) => {
+                showStatus(`❌ Erreur: ${data.error}`, 'error');
+                document.getElementById('pairingSection').classList.remove('active');
+                clearInterval(countdownInterval);
+            });
+            
+            // Erreur pairing
+            socket.on('pairing_error', (data) => {
+                showStatus(`❌ ${data.error}`, 'error');
+                document.getElementById('pairingSection').classList.remove('active');
+                clearInterval(countdownInterval);
+            });
+            
+            // Déconnexion
+            socket.on('connection_closed', (data) => {
+                showStatus('🔒 Connexion fermée', 'error');
+                document.getElementById('pairingSection').classList.remove('active');
+                clearInterval(countdownInterval);
+            });
+        }
+        
+        // Démarrer le compte à rebours
+        function startCountdown(seconds) {
+            const countdownElement = document.getElementById('countdown');
+            let timeLeft = seconds;
+            
+            countdownElement.textContent = timeLeft;
+            
+            clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                countdownElement.textContent = timeLeft;
+                
+                // Changer la couleur quand il reste peu de temps
+                if (timeLeft <= 30) {
+                    countdownElement.style.color = 'var(--warning)';
+                }
+                if (timeLeft <= 10) {
+                    countdownElement.style.color = 'var(--danger)';
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    showStatus('⏱️ Code expiré', 'error');
+                    document.getElementById('pairingSection').classList.remove('active');
+                }
+            }, 1000);
         }
         
         // Connecter le bot
         async function connectBot() {
-            const number = document.getElementById('whatsappNumber').value.trim();
+            const numberInput = document.getElementById('whatsappNumber');
+            const number = numberInput.value.trim().replace(/\s+/g, '');
             const btn = document.getElementById('connectBtn');
             
+            // Validation
             if (!number.match(/^\+[1-9]\d{1,14}$/)) {
-                showStatus('❌ Format invalide. Utilisez: +33612345678', 'error');
+                showStatus('❌ Format invalide. Exemple: +24105730123', 'error');
+                numberInput.focus();
                 return;
             }
             
-            btn.innerHTML = '<span class="spinner"></span> Connexion...';
+            // Désactiver le bouton et afficher spinner
+            btn.innerHTML = '<span class="spinner"></span> Génération du code...';
             btn.disabled = true;
             
             try {
@@ -434,39 +678,82 @@
                 
                 const data = await response.json();
                 
-                if (data.error) {
-                    showStatus(`❌ ${data.error}`, 'error');
-                } else {
-                    currentSocketId = data.socketId;
-                    socket.emit('join_session', currentSocketId);
-                    showStatus(data.message, 'success');
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erreur serveur');
                 }
+                
+                if (data.success) {
+                    if (data.alreadyConnected) {
+                        showStatus('⚠️ Ce numéro est déjà connecté', 'info');
+                    } else {
+                        currentSocketId = data.socketId;
+                        socket.emit('join_session', currentSocketId);
+                        showStatus('⌛ Génération du code en cours...', 'info');
+                    }
+                }
+                
             } catch (error) {
-                showStatus('❌ Erreur réseau', 'error');
+                console.error('Erreur réseau:', error);
+                showStatus('❌ Erreur réseau ou serveur. Réessayez.', 'error');
             } finally {
+                // Réactiver le bouton
                 btn.innerHTML = '<i class="fas fa-plug"></i> Connecter le bot';
                 btn.disabled = false;
             }
         }
         
+        // Copier le code
+        function copyPairingCode() {
+            if (!currentPairingCode) return;
+            
+            navigator.clipboard.writeText(currentPairingCode).then(() => {
+                const codeElement = document.getElementById('pairingCodeDisplay');
+                const originalText = codeElement.textContent;
+                
+                // Animation de confirmation
+                codeElement.textContent = '✓ COPIÉ !';
+                codeElement.style.color = 'var(--success)';
+                
+                setTimeout(() => {
+                    codeElement.textContent = originalText;
+                    codeElement.style.color = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Erreur copie:', err);
+                showStatus('❌ Impossible de copier', 'error');
+            });
+        }
+        
         // Annuler la connexion
-        function cancelConnection() {
+        async function cancelConnection() {
             if (currentSocketId) {
-                socket.emit('leave_session', currentSocketId);
+                try {
+                    await fetch(`/api/disconnect/${currentSocketId}`, {
+                        method: 'DELETE'
+                    });
+                    socket.emit('leave_session', currentSocketId);
+                } catch (error) {
+                    console.error('Erreur déconnexion:', error);
+                }
             }
-            document.getElementById('qrSection').classList.remove('active');
-            showStatus('Connexion annulée', 'error');
+            
+            document.getElementById('pairingSection').classList.remove('active');
+            clearInterval(countdownInterval);
+            showStatus('Connexion annulée', 'info');
         }
         
         // Afficher un message de statut
-        function showStatus(message, type = '') {
+        function showStatus(message, type = 'info') {
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.textContent = message;
-            statusDiv.className = 'status';
-            if (type) statusDiv.classList.add(type);
+            statusDiv.className = 'status ' + type;
             
-            if (type === 'error') {
-                setTimeout(() => statusDiv.textContent = '', 5000);
+            // Auto-hide après 5 secondes pour les erreurs
+            if (type === 'error' || type === 'info') {
+                setTimeout(() => {
+                    statusDiv.className = 'status';
+                    statusDiv.textContent = '';
+                }, 5000);
             }
         }
         
@@ -481,18 +768,30 @@
             }
         }
         
-        // Au chargement
+        // Au chargement de la page
         document.addEventListener('DOMContentLoaded', () => {
             initSocket();
             updateActiveBots();
+            
+            // Rafraîchir les stats toutes les 30 secondes
             setInterval(updateActiveBots, 30000);
             
             // Auto-focus sur l'input
-            document.getElementById('whatsappNumber').focus();
+            const numberInput = document.getElementById('whatsappNumber');
+            numberInput.focus();
+            numberInput.select();
             
             // Entrée = connexion
-            document.getElementById('whatsappNumber').addEventListener('keypress', (e) => {
+            numberInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') connectBot();
+            });
+            
+            // Auto-format du numéro
+            numberInput.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value && !value.startsWith('+')) {
+                    e.target.value = '+' + value;
+                }
             });
         });
     </script>
