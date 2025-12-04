@@ -7,7 +7,7 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.4.0",
+    "@whiskeysockets/baileys": "https://github.com/afrinode-dev/crazy-bot/archive/refs/tags/v.0.0.1.tar.gz",
     "express": "^4.18.2",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.2",
