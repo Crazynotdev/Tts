@@ -1,0 +1,18 @@
+{
+  "name": "crazy-mini-xmd",
+  "version": "2.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.4.0",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.2",
+    "dotenv": "^16.3.1",
+    "express-rate-limit": "^7.1.5",
+    "winston": "^3.11.0"
+  }
+}
