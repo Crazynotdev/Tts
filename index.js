@@ -6,6 +6,7 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  downloadMediaMessage,
 } = require("@whiskeysockets/baileys");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -25,7 +26,7 @@ app.use(express.static(path.join(__dirname, "public")));
 const SESSIONS_DIR = path.join(__dirname, "sessions");
 const SEEN_JIDS_FILE = path.join(__dirname, "seen_jids.json");
 
-if (!fs.existsSync(SEEN_JIDS_FILE)) fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify([]));
+if (!fs.existsSync(SEEN_JIDS_FILE)) fs.writeFileSync(SEEN_JIDS_FILE, "[]");
 if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 
 let sessions = {}; // { sessionId: { sock, socketClientId, isConnecting } }
@@ -43,8 +44,9 @@ async function sendMenu(sock, jid) {
 .info - Infos sur le bot
 .quote - Citation aléatoire
 .randomnum - Nombre aléatoire
-.sticker - Créer sticker (si média)
+.sticker - Créer sticker (répondez à une image avec .sticker)
 .waifu - Image waifu
+.dl - Télécharger un média (répondez avec .dl)
 `,
   });
 }
@@ -75,7 +77,7 @@ async function sendQuote(sock, jid) {
     "La vie est belle !",
     "Ne rêve pas ta vie, vis tes rêves !",
     "Le succès est la somme de petits efforts répétés.",
-    "Rien n’est impossible, l’impossible prend juste un peu plus de temps."
+    "Rien n'est impossible, l'impossible prend juste un peu plus de temps."
   ];
   const q = quotes[Math.floor(Math.random() * quotes.length)];
   await sock.sendMessage(jid, { text: `💬 Citation : ${q}` });
@@ -96,6 +98,97 @@ async function sendWaifu(sock, jid) {
   await sock.sendMessage(jid, { image: { url: img }, caption: "✨ Waifu aléatoire" });
 }
 
+async function createSticker(sock, jid, quotedMsg) {
+  try {
+    if (!quotedMsg || (!quotedMsg.imageMessage && !quotedMsg.videoMessage)) {
+      await sock.sendMessage(jid, { text: "❌ Veuillez répondre à une image ou vidéo avec .sticker" });
+      return;
+    }
+
+    await sock.sendMessage(jid, { text: "⏳ Création du sticker en cours..." });
+    
+    const mediaType = quotedMsg.imageMessage ? 'image' : 'video';
+    const buffer = await downloadMediaMessage(
+      quotedMsg,
+      mediaType,
+      {},
+      { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+    );
+
+    await sock.sendMessage(jid, {
+      sticker: Buffer.from(buffer),
+    }, { quoted: quotedMsg });
+  } catch (error) {
+    console.error("Erreur création sticker:", error);
+    await sock.sendMessage(jid, { text: "❌ Erreur lors de la création du sticker" });
+  }
+}
+
+async function downloadMedia(sock, jid, quotedMsg) {
+  try {
+    if (!quotedMsg || (!quotedMsg.imageMessage && !quotedMsg.videoMessage && !quotedMsg.audioMessage && !quotedMsg.documentMessage)) {
+      await sock.sendMessage(jid, { text: "❌ Veuillez répondre à un média avec .dl" });
+      return;
+    }
+
+    await sock.sendMessage(jid, { text: "⏳ Téléchargement du média en cours..." });
+    
+    let mediaType = 'unknown';
+    if (quotedMsg.imageMessage) mediaType = 'image';
+    else if (quotedMsg.videoMessage) mediaType = 'video';
+    else if (quotedMsg.audioMessage) mediaType = 'audio';
+    else if (quotedMsg.documentMessage) mediaType = 'document';
+    
+    const buffer = await downloadMediaMessage(
+      quotedMsg,
+      mediaType,
+      {},
+      { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+    );
+
+    const extension = mediaType === 'image' ? '.jpg' : 
+                     mediaType === 'video' ? '.mp4' : 
+                     mediaType === 'audio' ? '.mp3' : '.bin';
+    
+    const filename = `downloaded_${Date.now()}${extension}`;
+    const filePath = path.join(__dirname, 'downloads', filename);
+    
+    if (!fs.existsSync(path.join(__dirname, 'downloads'))) {
+      fs.mkdirSync(path.join(__dirname, 'downloads'));
+    }
+    
+    fs.writeFileSync(filePath, buffer);
+    
+    await sock.sendMessage(jid, { 
+      text: `✅ Média téléchargé: ${filename}\nChemin: ${filePath}` 
+    });
+  } catch (error) {
+    console.error("Erreur téléchargement média:", error);
+    await sock.sendMessage(jid, { text: "❌ Erreur lors du téléchargement du média" });
+  }
+}
+
+// -------------------------
+// Message de bienvenue
+// -------------------------
+async function sendWelcomeMessage(sock, jid, pushName) {
+  const welcomeText = `👋 Bienvenue ${pushName || "Cher utilisateur"} !
+
+🤖 *CRAZY MINI XMD* est maintenant connecté.
+
+💡 Tapez *.menu* pour voir les commandes disponibles.
+
+📱 Bot développé avec Baileys
+✨ Profitez de toutes les fonctionnalités !`;
+  
+  await sock.sendMessage(jid, { 
+    text: welcomeText,
+    contextInfo: {
+      mentionedJid: jid.includes('@s.whatsapp.net') ? [jid.split('@')[0]] : []
+    }
+  });
+}
+
 // -------------------------
 // Récupérer le texte du message (multi-type)
 // -------------------------
@@ -105,6 +198,7 @@ function getMessageText(msg) {
     msg.message?.extendedTextMessage?.text ||
     msg.message?.imageMessage?.caption ||
     msg.message?.videoMessage?.caption ||
+    msg.message?.audioMessage?.caption ||
     ""
   );
 }
@@ -159,6 +253,16 @@ async function startSession(number, socketClientId) {
       sessions[sessionId].isConnecting = false;
       io.to(socketClientId).emit("connection_success", { number });
       console.log(`[${number}] Bot connecté`);
+      
+      // Envoi du message de bienvenue au statut
+      try {
+        await sock.sendMessage(sock.user.id, { 
+          text: "✅ *CRAZY MINI XMD* est maintenant connecté !\n\nTapez *.menu* pour voir les commandes disponibles." 
+        });
+      } catch (error) {
+        console.log("Erreur envoi message de bienvenue:", error);
+      }
+      
       updateBotCount();
     }
   });
@@ -175,9 +279,12 @@ async function startSession(number, socketClientId) {
 
     for (const msg of messages) {
       const jid = msg.key.remoteJid;
-      if (!seenJids.includes(jid)) {
+      
+      // Message de bienvenue pour les nouveaux contacts
+      if (!seenJids.includes(jid) && !msg.key.fromMe) {
         seenJids.push(jid);
         fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify(seenJids, null, 2));
+        await sendWelcomeMessage(sock, jid, msg.pushName);
       }
 
       if (!msg.message || msg.key.fromMe) continue;
@@ -187,6 +294,9 @@ async function startSession(number, socketClientId) {
 
       const args = body.slice(1).trim().split(/ +/);
       const command = args[0].toLowerCase();
+
+      // Récupérer le message cité pour les commandes .sticker et .dl
+      const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
       // -------------------------
       // Switch/case des commandes
@@ -211,13 +321,21 @@ async function startSession(number, socketClientId) {
           await sendQuote(sock, jid);
           break;
         case "randomnum":
+        case "random":
           await sendRandomNum(sock, jid);
           break;
         case "waifu":
           await sendWaifu(sock, jid);
           break;
+        case "sticker":
+          await createSticker(sock, jid, quotedMsg);
+          break;
+        case "dl":
+        case "download":
+          await downloadMedia(sock, jid, quotedMsg);
+          break;
         default:
-          await sock.sendMessage(jid, { text: "❌ Commande inconnue" });
+          await sock.sendMessage(jid, { text: "❌ Commande inconnue. Tapez .menu pour la liste" });
           break;
       }
     }
@@ -232,6 +350,7 @@ async function startSession(number, socketClientId) {
 app.post("/api/connect", async (req, res) => {
   const { number, socketId } = req.body;
   if (!number) return res.status(400).json({ error: "Numéro manquant" });
+  if (!socketId) return res.status(400).json({ error: "Socket ID manquant" });
 
   try {
     await startSession(number, socketId);
@@ -243,10 +362,40 @@ app.post("/api/connect", async (req, res) => {
 });
 
 // -------------------------
+// API pour déconnecter un bot
+// -------------------------
+app.post("/api/disconnect", async (req, res) => {
+  const { number } = req.body;
+  if (!number) return res.status(400).json({ error: "Numéro manquant" });
+
+  const sessionId = number.replace(/\D/g, "");
+  const session = sessions[sessionId];
+
+  if (session) {
+    try {
+      await session.sock.logout();
+      delete sessions[sessionId];
+      updateBotCount();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Erreur lors de la déconnexion" });
+    }
+  } else {
+    res.status(404).json({ error: "Session non trouvée" });
+  }
+});
+
+// -------------------------
 // Socket.IO
 // -------------------------
 io.on("connection", (socket) => {
-  socket.on("join_session", (id) => socket.join(id));
+  socket.on("join_session", (id) => {
+    socket.join(id);
+  });
+  
+  socket.on("disconnect", () => {
+    console.log("Client socket déconnecté:", socket.id);
+  });
 });
 
 // -------------------------
@@ -255,6 +404,7 @@ io.on("connection", (socket) => {
 function updateBotCount() {
   const count = Object.keys(sessions).length;
   io.emit("bots_update", count);
+  console.log(`📊 Bots connectés: ${count}`);
 }
 
 // -------------------------
@@ -265,7 +415,22 @@ app.get("/", (req, res) => {
 });
 
 // -------------------------
+// Route d'état des sessions
+// -------------------------
+app.get("/api/sessions", (req, res) => {
+  const sessionList = Object.keys(sessions).map(sessionId => ({
+    number: sessionId,
+    isConnecting: sessions[sessionId].isConnecting,
+    socketClientId: sessions[sessionId].socketClientId
+  }));
+  res.json({ sessions: sessionList, total: sessionList.length });
+});
+
+// -------------------------
 // Lancement serveur
 // -------------------------
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
+  console.log(`📁 Sessions sauvegardées dans: ${SESSIONS_DIR}`);
+});
