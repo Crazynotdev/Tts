@@ -16,6 +16,7 @@ const path = require("path");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: "*" });
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -26,11 +27,15 @@ const SEEN_JIDS_FILE = path.join(__dirname, "seen_jids.json");
 if (!fs.existsSync(SEEN_JIDS_FILE)) fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify([]));
 if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 
-let sessions = {}; // { sessionId: { sock, socketClientId } }
+let sessions = {}; // { sessionId: { sock, socketClientId, isConnecting } }
 
-// ----- Fonction pour démarrer une session WhatsApp -----
+// ----- Démarrage d'une session WhatsApp -----
 async function startSession(number, socketClientId) {
   const sessionId = number.replace(/\D/g, "");
+
+  if (!sessions[sessionId]) sessions[sessionId] = { isConnecting: true };
+  else if (sessions[sessionId].isConnecting) return; // déjà en connexion
+
   const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSIONS_DIR, sessionId));
   const { version } = await fetchLatestBaileysVersion();
 
@@ -42,17 +47,14 @@ async function startSession(number, socketClientId) {
     browser: ["CRAZY MINI XMD", "Chrome", "1.0"],
   });
 
-  sessions[sessionId] = { sock, socketClientId };
+  sessions[sessionId] = { sock, socketClientId, isConnecting: true };
 
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, pairingCode } = update;
 
-    // Envoi du QR / pairing code
+    // Envoyer pairing code au client
     if (pairingCode) {
-      io.to(socketClientId).emit("pairing_code", {
-        code: pairingCode,
-        rawCode: pairingCode,
-      });
+      io.to(socketClientId).emit("pairing_code", { code: pairingCode, rawCode: pairingCode });
     }
 
     // Connexion fermée
@@ -60,7 +62,8 @@ async function startSession(number, socketClientId) {
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (reason !== DisconnectReason.loggedOut) {
         console.log(`[${number}] Reconnexion...`);
-        startSession(number, socketClientId);
+        sessions[sessionId].isConnecting = false;
+        startSession(number, socketClientId); // relancer proprement
       } else {
         console.log(`[${number}] Session supprimée`);
         delete sessions[sessionId];
@@ -70,6 +73,7 @@ async function startSession(number, socketClientId) {
 
     // Connexion ouverte
     if (connection === "open") {
+      sessions[sessionId].isConnecting = false;
       io.to(socketClientId).emit("connection_success", { number });
       console.log(`[${number}] Bot connecté`);
       updateBotCount();
@@ -78,7 +82,7 @@ async function startSession(number, socketClientId) {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // ----- Gestion des messages et commandes -----
+  // ----- Gestion messages et commandes -----
   sock.ev.on("messages.upsert", (m) => {
     const messages = m.messages;
     const seenJids = JSON.parse(fs.readFileSync(SEEN_JIDS_FILE));
@@ -100,7 +104,7 @@ async function startSession(number, socketClientId) {
 
       switch (command) {
         case "menu":
-          sock.sendMessage(jid, { text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello" });
+          sock.sendMessage(jid, { text: "✅ Commandes :\n.menu\n.ping\n.hello" });
           break;
         case "ping":
           sock.sendMessage(jid, { text: "🏓 Pong!" });
@@ -143,7 +147,7 @@ function updateBotCount() {
   io.emit("bots_update", count);
 }
 
-// ----- Route index.html -----
+// ----- Route principale -----
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
