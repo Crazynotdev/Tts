@@ -33,8 +33,8 @@ let sessions = {}; // { sessionId: { sock, socketClientId, isConnecting } }
 async function startSession(number, socketClientId) {
   const sessionId = number.replace(/\D/g, "");
 
-  if (!sessions[sessionId]) sessions[sessionId] = { isConnecting: true };
-  else if (sessions[sessionId].isConnecting) return; // déjà en connexion
+  if (sessions[sessionId]?.isConnecting) return;
+  sessions[sessionId] = { isConnecting: true };
 
   const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSIONS_DIR, sessionId));
   const { version } = await fetchLatestBaileysVersion();
@@ -47,14 +47,17 @@ async function startSession(number, socketClientId) {
     browser: ["CRAZY MINI XMD", "Chrome", "1.0"],
   });
 
-  sessions[sessionId] = { sock, socketClientId, isConnecting: true };
+  sessions[sessionId].sock = sock;
+  sessions[sessionId].socketClientId = socketClientId;
 
+  // ----- Gestion de la connexion -----
   sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect, pairingCode } = update;
+    const { connection, lastDisconnect, qr } = update;
 
-    // Envoyer pairing code au client
-    if (pairingCode) {
-      io.to(socketClientId).emit("pairing_code", { code: pairingCode, rawCode: pairingCode });
+    // Envoi du QR code au front
+    if (qr) {
+      io.to(socketClientId).emit("pairing_code", { code: qr, rawCode: qr });
+      console.log(`[${number}] QR code envoyé`);
     }
 
     // Connexion fermée
@@ -63,7 +66,7 @@ async function startSession(number, socketClientId) {
       if (reason !== DisconnectReason.loggedOut) {
         console.log(`[${number}] Reconnexion...`);
         sessions[sessionId].isConnecting = false;
-        startSession(number, socketClientId); // relancer proprement
+        startSession(number, socketClientId);
       } else {
         console.log(`[${number}] Session supprimée`);
         delete sessions[sessionId];
