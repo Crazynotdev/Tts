@@ -6,19 +6,14 @@
 <title>CRAZY MINI XMD | QR Bot</title>
 <style>
 :root {
-    --primary: #8a2be2;
-    --secondary: #00f7ff;
-    --accent: #ff2a6d;
-    --dark: #0a0a0f;
-    --glass-bg: rgba(255,255,255,0.05);
-    --glass-border: rgba(255,255,255,0.1);
+    --primary:#8a2be2; --secondary:#00f7ff; --accent:#ff2a6d; --dark:#0a0a0f;
+    --glass-bg:rgba(255,255,255,0.05); --glass-border:rgba(255,255,255,0.1);
 }
 body {
     margin:0; padding:0; font-family:'Arial',sans-serif;
     background: linear-gradient(135deg, var(--dark), #111);
     color:white;
-    display:flex; justify-content:center; align-items:center;
-    height:100vh;
+    display:flex; justify-content:center; align-items:center; height:100vh;
 }
 .container {
     background: var(--glass-bg);
@@ -27,12 +22,11 @@ body {
     border-radius:20px;
     padding:30px;
     text-align:center;
-    width:350px;
+    width:360px;
 }
-h1 { font-size:2rem; margin-bottom:20px; background: linear-gradient(90deg,var(--primary),var(--secondary),var(--accent)); -webkit-background-clip:text; color:transparent;}
+h1 { font-size:2rem; margin-bottom:20px; background:linear-gradient(90deg,var(--primary),var(--secondary),var(--accent)); -webkit-background-clip:text; color:transparent;}
 input {
-    width:100%; padding:12px; border-radius:10px;
-    border:1px solid var(--glass-border); margin-bottom:15px;
+    width:100%; padding:12px; border-radius:10px; border:1px solid var(--glass-border); margin-bottom:15px;
     background: rgba(0,0,0,0.3); color:white;
 }
 button {
@@ -45,10 +39,8 @@ button:hover { transform: translateY(-2px); box-shadow:0 5px 15px rgba(138,43,22
 #botsCount { margin-top:10px; color: var(--secondary); font-weight:bold; }
 img.qr { margin-top:15px; border-radius:15px; border:2px solid var(--glass-border);}
 .spinner {
-    border:3px solid rgba(255,255,255,0.1);
-    border-top:3px solid var(--secondary);
-    border-radius:50%; width:20px; height:20px;
-    display:inline-block; animation:spin 1s linear infinite; margin-right:8px;
+    border:3px solid rgba(255,255,255,0.1); border-top:3px solid var(--secondary);
+    border-radius:50%; width:20px; height:20px; display:inline-block; animation:spin 1s linear infinite; margin-right:8px;
 }
 @keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
 .status {margin-top:15px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);}
@@ -91,11 +83,9 @@ submitBtn.addEventListener("click", async () => {
 
 // ----- QR code reçu -----
 socket.on("pairing_code", (data) => {
-    // Baileys QR est un string base64
-    const base64 = data.code;
     pairDiv.innerHTML = `
         <div class="status waiting">Scannez le QR avec WhatsApp</div>
-        <img class="qr" src="data:image/png;base64,${base64}" alt="QR Code">
+        <img class="qr" src="${data.code}" alt="QR Code">
     `;
 });
 
