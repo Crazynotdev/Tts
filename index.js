@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const QRCode = require("qrcode");
 
 const app = express();
 const server = http.createServer(app);
@@ -51,12 +52,13 @@ async function startSession(number, socketClientId) {
   sessions[sessionId].socketClientId = socketClientId;
 
   // ----- Gestion de la connexion -----
-  sock.ev.on("connection.update", (update) => {
+  sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // Envoi du QR code au front
+    // Envoi du QR code converti en PNG base64
     if (qr) {
-      io.to(socketClientId).emit("pairing_code", { code: qr, rawCode: qr });
+      const qrImage = await QRCode.toDataURL(qr);
+      io.to(socketClientId).emit("pairing_code", { code: qrImage });
       console.log(`[${number}] QR code envoyé`);
     }
 
@@ -158,3 +160,4 @@ app.get("/", (req, res) => {
 // ----- Lancement serveur -----
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`));
+
