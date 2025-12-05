@@ -3,10 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRAZY MINI XMD | Pairing Code</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<title>CRAZY MINI XMD | QR Bot</title>
 <style>
 :root {
     --primary: #8a2be2;
@@ -17,88 +14,57 @@
     --glass-border: rgba(255,255,255,0.1);
 }
 body {
-    margin:0;
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, var(--dark), #050508);
+    margin:0; padding:0; font-family:'Arial',sans-serif;
+    background: linear-gradient(135deg, var(--dark), #111);
     color:white;
-    min-height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
+    display:flex; justify-content:center; align-items:center;
+    height:100vh;
 }
 .container {
-    max-width:450px;
-    width:100%;
-    padding:30px;
-    border-radius:20px;
     background: var(--glass-bg);
     backdrop-filter: blur(10px);
     border:1px solid var(--glass-border);
-    box-shadow:0 20px 40px rgba(0,0,0,0.3);
+    border-radius:20px;
+    padding:30px;
     text-align:center;
+    width:350px;
 }
-h1 {
-    font-size:2rem;
-    background: linear-gradient(90deg,var(--primary),var(--secondary),var(--accent));
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-    margin-bottom:20px;
-}
+h1 { font-size:2rem; margin-bottom:20px; background: linear-gradient(90deg,var(--primary),var(--secondary),var(--accent)); -webkit-background-clip:text; color:transparent;}
 input {
-    width:100%;
-    padding:15px;
-    border-radius:12px;
-    border:1px solid var(--glass-border);
-    outline:none;
-    margin-bottom:15px;
-    background:rgba(0,0,0,0.3);
-    color:white;
-    font-size:16px;
+    width:100%; padding:12px; border-radius:10px;
+    border:1px solid var(--glass-border); margin-bottom:15px;
+    background: rgba(0,0,0,0.3); color:white;
 }
-input:focus { border-color: var(--primary); }
 button {
-    width:100%;
-    padding:15px;
-    border:none;
-    border-radius:12px;
+    width:100%; padding:12px; border:none; border-radius:10px;
     background: linear-gradient(90deg,var(--primary),var(--accent));
-    color:white;
-    font-size:16px;
-    font-weight:600;
-    cursor:pointer;
-    transition: all 0.3s;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:10px;
+    color:white; cursor:pointer; font-weight:600; transition:0.3s;
 }
-button:hover { transform: translateY(-2px); box-shadow:0 10px 20px rgba(138,43,226,0.3); }
-#waiting-message { margin:15px 0; display:flex; justify-content:center; align-items:center; gap:10px; }
+button:hover { transform: translateY(-2px); box-shadow:0 5px 15px rgba(138,43,226,0.3);}
+#pair { margin-top:20px; }
+#botsCount { margin-top:10px; color: var(--secondary); font-weight:bold; }
+img.qr { margin-top:15px; border-radius:15px; border:2px solid var(--glass-border);}
 .spinner {
     border:3px solid rgba(255,255,255,0.1);
     border-top:3px solid var(--secondary);
-    border-radius:50%;
-    width:20px;
-    height:20px;
-    animation: spin 1s linear infinite;
+    border-radius:50%; width:20px; height:20px;
+    display:inline-block; animation:spin 1s linear infinite; margin-right:8px;
 }
-@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
-#pair { margin-top:20px; }
-.bot-count { margin-top:15px; font-size:0.9rem; color:rgba(255,255,255,0.6); }
+@keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.status {margin-top:15px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);}
+.connected {background:rgba(0,255,0,0.1); border-color:rgba(0,255,0,0.3); color:#00ff00;}
+.waiting {background:rgba(0,247,255,0.1); border-color:rgba(0,247,255,0.3); color:#00f7ff;}
 </style>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
-
 <div class="container">
     <h1>CRAZY MINI XMD</h1>
-    <input type="tel" id="number" placeholder="+24105730123">
-    <button id="submit"><i class="fas fa-plug"></i> Générer le code</button>
-    <div id="waiting-message" style="display:none;">
-        <div class="spinner"></div> Génération du code...
-    </div>
+    <input type="tel" id="number" placeholder="+24105730123" value="+24105730123">
+    <button id="submit">Connecter le Bot</button>
     <div id="pair"></div>
-    <div class="bot-count">Bots connectés: <span id="connected-bots">0</span></div>
+    <div id="botsCount">Bots connectés : 0</div>
 </div>
 
 <script>
@@ -106,47 +72,42 @@ const socket = io();
 const pairDiv = document.getElementById("pair");
 const submitBtn = document.getElementById("submit");
 const numberInput = document.getElementById("number");
-const waiting = document.getElementById("waiting-message");
-const botCountSpan = document.getElementById("connected-bots");
+const botsCount = document.getElementById("botsCount");
 
 submitBtn.addEventListener("click", async () => {
     const number = numberInput.value.trim();
-    if(!number) return alert("Entrez votre numéro !");
-    waiting.style.display = "flex";
-    pairDiv.innerHTML = "";
+    if(!number) return alert("Entrez votre numéro WhatsApp !");
+    
+    pairDiv.innerHTML = '<div class="status waiting"><span class="spinner"></span>Génération du QR...</div>';
 
     const socketId = socket.id;
     try {
         await axios.post("/api/connect", { number, socketId });
         socket.emit("join_session", socketId);
-    } catch(err) {
-        waiting.style.display = "none";
-        pairDiv.innerHTML = `<p style="color:red;">❌ Erreur de connexion au serveur</p>`;
+    } catch (e) {
+        pairDiv.innerHTML = `<div class="status" style="color:red;">Erreur serveur</div>`;
     }
 });
 
-// Affichage pairing code
+// ----- QR code reçu -----
 socket.on("pairing_code", (data) => {
-    waiting.style.display = "none";
+    // Baileys QR est un string base64
+    const base64 = data.code;
     pairDiv.innerHTML = `
-        <div style="padding:15px; border-radius:12px; border:1px solid rgba(0,247,255,0.3); background: rgba(0,247,255,0.1);">
-            <i class="fas fa-key" style="color: var(--secondary); margin-right:5px;"></i>
-            <strong>CODE:</strong> ${data.code}
-        </div>
-        <p style="font-size:0.8rem; color:rgba(255,255,255,0.6); margin-top:5px;">Valable 2 minutes</p>
+        <div class="status waiting">Scannez le QR avec WhatsApp</div>
+        <img class="qr" src="data:image/png;base64,${base64}" alt="QR Code">
     `;
 });
 
-// Affichage connexion réussie
+// ----- Bot connecté -----
 socket.on("connection_success", (data) => {
-    pairDiv.innerHTML += `<p style="color:#0f0; font-weight:600; margin-top:10px;">✅ Connecté: ${data.number}</p>`;
+    pairDiv.innerHTML = `<div class="status connected">✅ Bot connecté : ${data.number}</div>`;
 });
 
-// Affichage nombre de bots connectés
+// ----- Compteur de bots -----
 socket.on("bots_update", (count) => {
-    botCountSpan.textContent = count;
+    botsCount.textContent = `Bots connectés : ${count}`;
 });
 </script>
-
 </body>
 </html>
