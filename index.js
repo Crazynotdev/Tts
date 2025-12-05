@@ -109,7 +109,7 @@ async function createSticker(sock, jid, quotedMsg) {
     
     const mediaType = quotedMsg.imageMessage ? 'image' : 'video';
     const buffer = await downloadMediaMessage(
-      quotedMsg,
+      { message: quotedMsg },
       mediaType,
       {},
       { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
@@ -117,7 +117,7 @@ async function createSticker(sock, jid, quotedMsg) {
 
     await sock.sendMessage(jid, {
       sticker: Buffer.from(buffer),
-    }, { quoted: quotedMsg });
+    });
   } catch (error) {
     console.error("Erreur création sticker:", error);
     await sock.sendMessage(jid, { text: "❌ Erreur lors de la création du sticker" });
@@ -140,7 +140,7 @@ async function downloadMedia(sock, jid, quotedMsg) {
     else if (quotedMsg.documentMessage) mediaType = 'document';
     
     const buffer = await downloadMediaMessage(
-      quotedMsg,
+      { message: quotedMsg },
       mediaType,
       {},
       { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
@@ -193,12 +193,17 @@ async function sendWelcomeMessage(sock, jid, pushName) {
 // Récupérer le texte du message (multi-type)
 // -------------------------
 function getMessageText(msg) {
+  const message = msg.message || msg;
+  
+  if (msg.messageStubType === 'REVOKE') return '';
+  
   return (
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    msg.message?.imageMessage?.caption ||
-    msg.message?.videoMessage?.caption ||
-    msg.message?.audioMessage?.caption ||
+    message.conversation ||
+    message.extendedTextMessage?.text ||
+    message.imageMessage?.caption ||
+    message.videoMessage?.caption ||
+    message.audioMessage?.caption ||
+    message.documentMessage?.caption ||
     ""
   );
 }
@@ -270,74 +275,104 @@ async function startSession(number, socketClientId) {
   sock.ev.on("creds.update", saveCreds);
 
   // -------------------------
-  // Gestion messages entrants
+  // Gestion messages entrants - CORRIGÉ
   // -------------------------
   sock.ev.on("messages.upsert", async (m) => {
-    if (m.type !== "notify") return; 
+    console.log(`[${number}] Message reçu, type: ${m.type}`);
+    
+    // Accepter tous les types de messages, pas seulement "notify"
     const messages = m.messages;
     const seenJids = JSON.parse(fs.readFileSync(SEEN_JIDS_FILE));
 
     for (const msg of messages) {
+      // Ignorer les messages envoyés par le bot lui-même
+      if (msg.key.fromMe) continue;
+      
       const jid = msg.key.remoteJid;
       
-      // Message de bienvenue pour les nouveaux contacts
-      if (!seenJids.includes(jid) && !msg.key.fromMe) {
+      // Vérifier si c'est un nouveau contact
+      if (!seenJids.includes(jid)) {
         seenJids.push(jid);
         fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify(seenJids, null, 2));
         await sendWelcomeMessage(sock, jid, msg.pushName);
       }
 
-      if (!msg.message || msg.key.fromMe) continue;
-
+      // Récupérer le texte du message
       const body = getMessageText(msg);
+      console.log(`[${number}] Message texte: "${body}"`);
+      
       if (!body.startsWith(".")) continue;
 
       const args = body.slice(1).trim().split(/ +/);
       const command = args[0].toLowerCase();
 
       // Récupérer le message cité pour les commandes .sticker et .dl
-      const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      let quotedMsg = null;
+      if (msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+        quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
+      }
+
+      console.log(`[${number}] Commande détectée: ${command}`);
 
       // -------------------------
       // Switch/case des commandes
       // -------------------------
-      switch (command) {
-        case "menu":
-          await sendMenu(sock, jid);
-          break;
-        case "ping":
-          await sendPing(sock, jid);
-          break;
-        case "hello":
-          await sendHello(sock, jid, msg.pushName);
-          break;
-        case "time":
-          await sendTime(sock, jid);
-          break;
-        case "info":
-          await sendInfo(sock, jid);
-          break;
-        case "quote":
-          await sendQuote(sock, jid);
-          break;
-        case "randomnum":
-        case "random":
-          await sendRandomNum(sock, jid);
-          break;
-        case "waifu":
-          await sendWaifu(sock, jid);
-          break;
-        case "sticker":
-          await createSticker(sock, jid, quotedMsg);
-          break;
-        case "dl":
-        case "download":
-          await downloadMedia(sock, jid, quotedMsg);
-          break;
-        default:
-          await sock.sendMessage(jid, { text: "❌ Commande inconnue. Tapez .menu pour la liste" });
-          break;
+      try {
+        switch (command) {
+          case "menu":
+            await sendMenu(sock, jid);
+            break;
+          case "ping":
+            await sendPing(sock, jid);
+            break;
+          case "hello":
+            await sendHello(sock, jid, msg.pushName);
+            break;
+          case "time":
+            await sendTime(sock, jid);
+            break;
+          case "info":
+            await sendInfo(sock, jid);
+            break;
+          case "quote":
+            await sendQuote(sock, jid);
+            break;
+          case "randomnum":
+          case "random":
+            await sendRandomNum(sock, jid);
+            break;
+          case "waifu":
+            await sendWaifu(sock, jid);
+            break;
+          case "sticker":
+            await createSticker(sock, jid, quotedMsg);
+            break;
+          case "dl":
+          case "download":
+            await downloadMedia(sock, jid, quotedMsg);
+            break;
+          default:
+            await sock.sendMessage(jid, { text: "❌ Commande inconnue. Tapez .menu pour la liste" });
+            break;
+        }
+        console.log(`[${number}] Commande ${command} exécutée avec succès`);
+      } catch (error) {
+        console.error(`[${number}] Erreur exécution commande ${command}:`, error);
+        await sock.sendMessage(jid, { text: "❌ Erreur lors de l'exécution de la commande" });
       }
+    }
+  });
+
+  // Événement pour les mises à jour des messages (messages supprimés, etc.)
+  sock.ev.on("messages.update", (m) => {
+    // Gérer les messages supprimés si nécessaire
+    console.log(`[${number}] Message mis à jour`);
+  });
+
+  // Activer la réception des messages
+  sock.ev.on("connection.update", (update) => {
+    if (update.connection === "open") {
+      console.log(`[${number}] Prêt à recevoir des messages`);
     }
   });
 
@@ -389,8 +424,11 @@ app.post("/api/disconnect", async (req, res) => {
 // Socket.IO
 // -------------------------
 io.on("connection", (socket) => {
+  console.log("Client socket connecté:", socket.id);
+  
   socket.on("join_session", (id) => {
     socket.join(id);
+    console.log(`Socket ${socket.id} a rejoint la session ${id}`);
   });
   
   socket.on("disconnect", () => {
@@ -421,7 +459,8 @@ app.get("/api/sessions", (req, res) => {
   const sessionList = Object.keys(sessions).map(sessionId => ({
     number: sessionId,
     isConnecting: sessions[sessionId].isConnecting,
-    socketClientId: sessions[sessionId].socketClientId
+    socketClientId: sessions[sessionId].socketClientId,
+    isConnected: sessions[sessionId].sock?.user?.id ? true : false
   }));
   res.json({ sessions: sessionList, total: sessionList.length });
 });
@@ -433,4 +472,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
   console.log(`📁 Sessions sauvegardées dans: ${SESSIONS_DIR}`);
+  console.log(`📝 Logs des commandes activés`);
 });
