@@ -26,8 +26,9 @@ const SEEN_JIDS_FILE = path.join(__dirname, "seen_jids.json");
 if (!fs.existsSync(SEEN_JIDS_FILE)) fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify([]));
 if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 
-let sessions = {}; // sessions WhatsApp actives
+let sessions = {}; // { sessionId: { sock, socketClientId } }
 
+// ----- Fonction pour démarrer une session WhatsApp -----
 async function startSession(number, socketClientId) {
   const sessionId = number.replace(/\D/g, "");
   const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSIONS_DIR, sessionId));
@@ -41,28 +42,43 @@ async function startSession(number, socketClientId) {
     browser: ["CRAZY MINI XMD", "Chrome", "1.0"],
   });
 
-  sessions[sessionId] = { sock, saveCreds, socketClientId };
+  sessions[sessionId] = { sock, socketClientId };
 
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, pairingCode } = update;
 
+    // Envoi du QR / pairing code
     if (pairingCode) {
-      io.to(socketClientId).emit("pairing_code", { code: pairingCode, rawCode: pairingCode });
+      io.to(socketClientId).emit("pairing_code", {
+        code: pairingCode,
+        rawCode: pairingCode,
+      });
     }
 
+    // Connexion fermée
     if (connection === "close") {
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (reason !== DisconnectReason.loggedOut) startSession(number, socketClientId);
-      else console.log("Session supprimée pour", number);
+      if (reason !== DisconnectReason.loggedOut) {
+        console.log(`[${number}] Reconnexion...`);
+        startSession(number, socketClientId);
+      } else {
+        console.log(`[${number}] Session supprimée`);
+        delete sessions[sessionId];
+        updateBotCount();
+      }
     }
 
+    // Connexion ouverte
     if (connection === "open") {
       io.to(socketClientId).emit("connection_success", { number });
+      console.log(`[${number}] Bot connecté`);
+      updateBotCount();
     }
   });
 
   sock.ev.on("creds.update", saveCreds);
 
+  // ----- Gestion des messages et commandes -----
   sock.ev.on("messages.upsert", (m) => {
     const messages = m.messages;
     const seenJids = JSON.parse(fs.readFileSync(SEEN_JIDS_FILE));
@@ -82,20 +98,16 @@ async function startSession(number, socketClientId) {
       const args = body.slice(1).trim().split(/ +/);
       const command = args[0].toLowerCase();
 
-      // ======= SWITCH CASE COMMANDES =======
       switch (command) {
         case "menu":
           sock.sendMessage(jid, { text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello" });
           break;
-
         case "ping":
           sock.sendMessage(jid, { text: "🏓 Pong!" });
           break;
-
         case "hello":
           sock.sendMessage(jid, { text: `Hello ${msg.pushName || "user"}! 👋` });
           break;
-
         default:
           sock.sendMessage(jid, { text: "❌ Commande inconnue" });
           break;
@@ -103,28 +115,39 @@ async function startSession(number, socketClientId) {
     });
   });
 
-  const code = await sock.requestPairingCode(number);
-  io.to(socketClientId).emit("pairing_code", { code, rawCode: code });
-
   return sessionId;
 }
 
-// API connect
+// ----- API pour connecter un bot -----
 app.post("/api/connect", async (req, res) => {
-  const number = req.body.number;
-  const socketClientId = req.body.socketId;
+  const { number, socketId } = req.body;
   if (!number) return res.status(400).json({ error: "Numéro manquant" });
-  await startSession(number, socketClientId);
-  res.json({ success: true });
+
+  try {
+    await startSession(number, socketId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
 });
 
-// Socket.IO
+// ----- Socket.IO -----
 io.on("connection", (socket) => {
   socket.on("join_session", (id) => socket.join(id));
 });
 
-// Serve index.html
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+// ----- Compteur de bots connectés -----
+function updateBotCount() {
+  const count = Object.keys(sessions).length;
+  io.emit("bots_update", count);
+}
 
+// ----- Route index.html -----
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ----- Lancement serveur -----
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`));
