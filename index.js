@@ -13,7 +13,6 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 
-// ========== Config ==========
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: "*" });
@@ -25,10 +24,10 @@ const SESSIONS_DIR = path.join(__dirname, "sessions");
 const SEEN_JIDS_FILE = path.join(__dirname, "seen_jids.json");
 
 if (!fs.existsSync(SEEN_JIDS_FILE)) fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify([]));
+if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 
 let sessions = {}; // sessions WhatsApp actives
 
-// ========== Démarrer une session ==========
 async function startSession(number, socketClientId) {
   const sessionId = number.replace(/\D/g, "");
   const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSIONS_DIR, sessionId));
@@ -44,7 +43,6 @@ async function startSession(number, socketClientId) {
 
   sessions[sessionId] = { sock, saveCreds, socketClientId };
 
-  // ========== Connection update ==========
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, pairingCode } = update;
 
@@ -65,7 +63,6 @@ async function startSession(number, socketClientId) {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // ========== Messages reçus ==========
   sock.ev.on("messages.upsert", (m) => {
     const messages = m.messages;
     const seenJids = JSON.parse(fs.readFileSync(SEEN_JIDS_FILE));
@@ -88,9 +85,7 @@ async function startSession(number, socketClientId) {
       // ======= SWITCH CASE COMMANDES =======
       switch (command) {
         case "menu":
-          sock.sendMessage(jid, {
-            text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello",
-          });
+          sock.sendMessage(jid, { text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello" });
           break;
 
         case "ping":
@@ -108,33 +103,28 @@ async function startSession(number, socketClientId) {
     });
   });
 
-  // Obtenir pairing code réel
   const code = await sock.requestPairingCode(number);
   io.to(socketClientId).emit("pairing_code", { code, rawCode: code });
 
   return sessionId;
 }
 
-// ========== API HTTP ==========
+// API connect
 app.post("/api/connect", async (req, res) => {
   const number = req.body.number;
   const socketClientId = req.body.socketId;
   if (!number) return res.status(400).json({ error: "Numéro manquant" });
-
   await startSession(number, socketClientId);
   res.json({ success: true });
 });
 
-// ========== Socket.IO ==========
+// Socket.IO
 io.on("connection", (socket) => {
   socket.on("join_session", (id) => socket.join(id));
 });
 
-// ========== Serveur front ==========
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+// Serve index.html
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
-// ========== Lancer serveur ==========
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`));
