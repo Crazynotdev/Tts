@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const QRCode = require("qrcode");
 
 const app = express();
 const server = http.createServer(app);
@@ -30,10 +31,12 @@ if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 let sessions = {}; // { sessionId: { sock, socketClientId, isConnecting } }
 
 // -------------------------
-// Fonctions commandes WhatsApp
+// Fonctions commandes
 // -------------------------
 async function sendMenu(sock, jid) {
-  await sock.sendMessage(jid, { text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello\n.time" });
+  await sock.sendMessage(jid, {
+    text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello\n.time",
+  });
 }
 
 async function sendPing(sock, jid) {
@@ -54,6 +57,7 @@ async function sendTime(sock, jid) {
 // -------------------------
 async function startSession(number, socketClientId) {
   const sessionId = number.replace(/\D/g, "");
+
   if (sessions[sessionId]?.isConnecting) return;
   sessions[sessionId] = { isConnecting: true };
 
@@ -71,9 +75,15 @@ async function startSession(number, socketClientId) {
   sessions[sessionId].sock = sock;
   sessions[sessionId].socketClientId = socketClientId;
 
-  // ----- Connection update -----
-  sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect } = update;
+  // ----- Connexion QR et statut -----
+  sock.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      const qrImage = await QRCode.toDataURL(qr);
+      io.to(socketClientId).emit("pairing_code", { code: qrImage });
+      console.log(`[${number}] QR code envoyé`);
+    }
 
     if (connection === "close") {
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -98,27 +108,31 @@ async function startSession(number, socketClientId) {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // ----- Messages entrantes -----
-  sock.ev.on("messages.upsert", async (m) => {
+  // -------------------------
+  // Gestion des messages entrants
+  // -------------------------
+  sock.ev.on("messages.upsert", (m) => {
     const messages = m.messages;
     const seenJids = JSON.parse(fs.readFileSync(SEEN_JIDS_FILE));
 
-    for (const msg of messages) {
+    messages.forEach(async (msg) => {
       const jid = msg.key.remoteJid;
       if (!seenJids.includes(jid)) {
         seenJids.push(jid);
         fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify(seenJids, null, 2));
       }
 
-      if (!msg.message || msg.key.fromMe) continue;
+      if (!msg.message || msg.key.fromMe) return;
 
-      let body = msg.message.conversation || msg.message?.extendedTextMessage?.text || "";
-      if (!body.startsWith(".")) continue;
+      const body = msg.message.conversation || msg.message?.extendedTextMessage?.text || "";
+      if (!body.startsWith(".")) return;
 
       const args = body.slice(1).trim().split(/ +/);
       const command = args[0].toLowerCase();
 
-      // ----- Switch case des commandes -----
+      // -------------------------
+      // Switch/case des commandes
+      // -------------------------
       switch (command) {
         case "menu":
           await sendMenu(sock, jid);
@@ -136,7 +150,7 @@ async function startSession(number, socketClientId) {
           await sock.sendMessage(jid, { text: "❌ Commande inconnue" });
           break;
       }
-    }
+    });
   });
 
   return sessionId;
