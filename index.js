@@ -35,7 +35,17 @@ let sessions = {}; // { sessionId: { sock, socketClientId, isConnecting } }
 // -------------------------
 async function sendMenu(sock, jid) {
   await sock.sendMessage(jid, {
-    text: "✅ Commandes disponibles :\n.menu\n.ping\n.hello\n.time",
+    text: `✅ Commandes disponibles :
+.menu - Afficher les commandes
+.ping - Vérifier si le bot répond
+.hello - Saluer le bot
+.time - Heure actuelle
+.info - Infos sur le bot
+.quote - Citation aléatoire
+.randomnum - Nombre aléatoire
+.sticker - Créer sticker (si média)
+.waifu - Image waifu
+`,
   });
 }
 
@@ -50,6 +60,53 @@ async function sendHello(sock, jid, pushName) {
 async function sendTime(sock, jid) {
   const now = new Date().toLocaleString();
   await sock.sendMessage(jid, { text: `⏰ Heure actuelle : ${now}` });
+}
+
+async function sendInfo(sock, jid) {
+  await sock.sendMessage(jid, {
+    text: `🤖 Bot: CRAZY MINI XMD
+Sessions actives: ${Object.keys(sessions).length}
+Préfixe: .`,
+  });
+}
+
+async function sendQuote(sock, jid) {
+  const quotes = [
+    "La vie est belle !",
+    "Ne rêve pas ta vie, vis tes rêves !",
+    "Le succès est la somme de petits efforts répétés.",
+    "Rien n’est impossible, l’impossible prend juste un peu plus de temps."
+  ];
+  const q = quotes[Math.floor(Math.random() * quotes.length)];
+  await sock.sendMessage(jid, { text: `💬 Citation : ${q}` });
+}
+
+async function sendRandomNum(sock, jid) {
+  const num = Math.floor(Math.random() * 1000);
+  await sock.sendMessage(jid, { text: `🔢 Nombre aléatoire : ${num}` });
+}
+
+async function sendWaifu(sock, jid) {
+  const waifus = [
+    "https://i.imgur.com/1.png",
+    "https://i.imgur.com/2.png",
+    "https://i.imgur.com/3.png"
+  ];
+  const img = waifus[Math.floor(Math.random() * waifus.length)];
+  await sock.sendMessage(jid, { image: { url: img }, caption: "✨ Waifu aléatoire" });
+}
+
+// -------------------------
+// Récupérer le texte du message (multi-type)
+// -------------------------
+function getMessageText(msg) {
+  return (
+    msg.message?.conversation ||
+    msg.message?.extendedTextMessage?.text ||
+    msg.message?.imageMessage?.caption ||
+    msg.message?.videoMessage?.caption ||
+    ""
+  );
 }
 
 // -------------------------
@@ -109,23 +166,24 @@ async function startSession(number, socketClientId) {
   sock.ev.on("creds.update", saveCreds);
 
   // -------------------------
-  // Gestion des messages entrants
+  // Gestion messages entrants
   // -------------------------
-  sock.ev.on("messages.upsert", (m) => {
+  sock.ev.on("messages.upsert", async (m) => {
+    if (m.type !== "notify") return; 
     const messages = m.messages;
     const seenJids = JSON.parse(fs.readFileSync(SEEN_JIDS_FILE));
 
-    messages.forEach(async (msg) => {
+    for (const msg of messages) {
       const jid = msg.key.remoteJid;
       if (!seenJids.includes(jid)) {
         seenJids.push(jid);
         fs.writeFileSync(SEEN_JIDS_FILE, JSON.stringify(seenJids, null, 2));
       }
 
-      if (!msg.message || msg.key.fromMe) return;
+      if (!msg.message || msg.key.fromMe) continue;
 
-      const body = msg.message.conversation || msg.message?.extendedTextMessage?.text || "";
-      if (!body.startsWith(".")) return;
+      const body = getMessageText(msg);
+      if (!body.startsWith(".")) continue;
 
       const args = body.slice(1).trim().split(/ +/);
       const command = args[0].toLowerCase();
@@ -146,11 +204,23 @@ async function startSession(number, socketClientId) {
         case "time":
           await sendTime(sock, jid);
           break;
+        case "info":
+          await sendInfo(sock, jid);
+          break;
+        case "quote":
+          await sendQuote(sock, jid);
+          break;
+        case "randomnum":
+          await sendRandomNum(sock, jid);
+          break;
+        case "waifu":
+          await sendWaifu(sock, jid);
+          break;
         default:
           await sock.sendMessage(jid, { text: "❌ Commande inconnue" });
           break;
       }
-    });
+    }
   });
 
   return sessionId;
