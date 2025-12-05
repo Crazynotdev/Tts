@@ -1,475 +1,152 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRAZY MINI XMD | Pairing Code</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --primary: #8a2be2;
-            --secondary: #00f7ff;
-            --accent: #ff2a6d;
-            --dark: #0a0a0f;
-            --darker: #050508;
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-        }
-        
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
-            color: white;
-            font-family: 'Arial', sans-serif;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        #particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-        }
-        
-        .particle {
-            position: absolute;
-            border-radius: 50%;
-            opacity: 0.3;
-            animation: float linear infinite;
-        }
-        
-        @keyframes float {
-            0% { transform: translateY(100vh) rotate(0deg); }
-            100% { transform: translateY(-100px) rotate(360deg); }
-        }
-        
-        .container {
-            max-width: 500px;
-            margin: 50px auto;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .logo {
-            font-size: 2.5rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 10px;
-        }
-        
-        .tagline {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
-        }
-        
-        .card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        .input-group {
-            margin-bottom: 25px;
-        }
-        
-        input {
-            width: 100%;
-            padding: 15px 20px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            color: white;
-            font-size: 16px;
-            outline: none;
-            transition: all 0.3s;
-        }
-        
-        input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(138, 43, 226, 0.2);
-        }
-        
-        input::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
-        
-        button {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(138, 43, 226, 0.3);
-        }
-        
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        #pair {
-            margin-top: 25px;
-            min-height: 100px;
-            text-align: center;
-        }
-        
-        .code-display {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-        }
-        
-        .code-display:hover {
-            background: rgba(0, 0, 0, 0.4);
-            border-color: var(--primary);
-        }
-        
-        .code-text {
-            font-weight: 600;
-            color: var(--secondary);
-        }
-        
-        .code-value {
-            font-family: 'Courier New', monospace;
-            font-size: 24px;
-            font-weight: 900;
-            letter-spacing: 3px;
-            color: white;
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(138, 43, 226, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(138, 43, 226, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(138, 43, 226, 0); }
-        }
-        
-        .waiting-message {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
-            padding: 15px;
-            background: rgba(0, 247, 255, 0.1);
-            border-radius: 12px;
-            border: 1px solid rgba(0, 247, 255, 0.3);
-        }
-        
-        .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top: 3px solid var(--secondary);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .instructions {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid var(--glass-border);
-        }
-        
-        .instructions ol {
-            margin-left: 20px;
-            margin-top: 10px;
-            color: rgba(255, 255, 255, 0.7);
-            line-height: 1.8;
-        }
-        
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.9rem;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRAZY MINI XMD | Pairing Code</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<style>
+:root {
+    --primary: #8a2be2;
+    --secondary: #00f7ff;
+    --accent: #ff2a6d;
+    --dark: #0a0a0f;
+    --glass-bg: rgba(255,255,255,0.05);
+    --glass-border: rgba(255,255,255,0.1);
+}
+body {
+    margin:0;
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, var(--dark), #050508);
+    color:white;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.container {
+    max-width:450px;
+    width:100%;
+    padding:30px;
+    border-radius:20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border:1px solid var(--glass-border);
+    box-shadow:0 20px 40px rgba(0,0,0,0.3);
+    text-align:center;
+}
+h1 {
+    font-size:2rem;
+    background: linear-gradient(90deg,var(--primary),var(--secondary),var(--accent));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    margin-bottom:20px;
+}
+input {
+    width:100%;
+    padding:15px;
+    border-radius:12px;
+    border:1px solid var(--glass-border);
+    outline:none;
+    margin-bottom:15px;
+    background:rgba(0,0,0,0.3);
+    color:white;
+    font-size:16px;
+}
+input:focus { border-color: var(--primary); }
+button {
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:12px;
+    background: linear-gradient(90deg,var(--primary),var(--accent));
+    color:white;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+    transition: all 0.3s;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+}
+button:hover { transform: translateY(-2px); box-shadow:0 10px 20px rgba(138,43,226,0.3); }
+#waiting-message { margin:15px 0; display:flex; justify-content:center; align-items:center; gap:10px; }
+.spinner {
+    border:3px solid rgba(255,255,255,0.1);
+    border-top:3px solid var(--secondary);
+    border-radius:50%;
+    width:20px;
+    height:20px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+#pair { margin-top:20px; }
+.bot-count { margin-top:15px; font-size:0.9rem; color:rgba(255,255,255,0.6); }
+</style>
 </head>
 <body>
-    <div id="particles"></div>
-    
-    <div class="container">
-        <div class="header">
-            <div class="logo">CRAZY MINI XMD</div>
-            <div class="tagline">Bot WhatsApp instantané • Pairing Code • Hébergé serveur</div>
-        </div>
-        
-        <div class="card">
-            <h2 style="margin-bottom: 20px; text-align: center;">
-                <i class="fas fa-bolt" style="color: var(--secondary);"></i>
-                Connectez votre bot WhatsApp
-            </h2>
-            
-            <div class="input-group">
-                <input 
-                    type="tel" 
-                    id="number" 
-                    placeholder="Ex: +24105730123"
-                    value="+24105730123"
-                >
-            </div>
-            
-            <button id="submit">
-                <i class="fas fa-plug"></i>
-                Générer le code de connexion
-            </button>
-            
-            <div id="waiting-message" class="waiting-message">
-                <span class="spinner"></span>
-                Génération du code en cours...
-            </div>
-            
-            <div id="pair"></div>
-            
-            <div class="instructions">
-                <h3><i class="fas fa-graduation-cap"></i> Comment se connecter :</h3>
-                <ol>
-                    <li>Entrez votre numéro WhatsApp avec le code pays</li>
-                    <li>Cliquez sur "Générer le code de connexion"</li>
-                    <li>Copiez le code qui apparaît ci-dessus</li>
-                    <li>Ouvrez WhatsApp → Paramètres → Appareils connectés</li>
-                    <li>Cliquez sur "Connecter un appareil"</li>
-                    <li>Saisissez le code quand WhatsApp le demande</li>
-                    <li>Votre bot est prêt ! Utilisez <code>.menu</code> pour commencer</li>
-                </ol>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <i class="fas fa-shield-alt"></i> Sécurisé • 1 session par numéro • Code valable 2 minutes
-        </div>
+
+<div class="container">
+    <h1>CRAZY MINI XMD</h1>
+    <input type="tel" id="number" placeholder="+24105730123">
+    <button id="submit"><i class="fas fa-plug"></i> Générer le code</button>
+    <div id="waiting-message" style="display:none;">
+        <div class="spinner"></div> Génération du code...
     </div>
-    
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script>
-        let a = document.getElementById("pair");
-        let b = document.getElementById("submit");
-        let c = document.getElementById("number");
-        let waitingMessage = document.getElementById("waiting-message");
-        let socket = null;
-        let currentSocketId = null;
+    <div id="pair"></div>
+    <div class="bot-count">Bots connectés: <span id="connected-bots">0</span></div>
+</div>
 
-        // Créer les particules de fond
-        function createParticles() {
-            const particlesContainer = document.getElementById('particles');
-            const particleCount = 30;
-            
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.classList.add('particle');
-                
-                const size = Math.random() * 10 + 2;
-                const colors = [
-                    'rgba(138, 43, 226, 0.3)', 
-                    'rgba(0, 247, 255, 0.3)', 
-                    'rgba(255, 42, 109, 0.3)'
-                ];
-                
-                particle.style.width = `${size}px`;
-                particle.style.height = `${size}px`;
-                particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-                particle.style.left = `${Math.random() * 100}%`;
-                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
-                particle.style.animationDelay = `${Math.random() * 5}s`;
-                
-                particlesContainer.appendChild(particle);
-            }
-        }
-        
-        createParticles();
+<script>
+const socket = io();
+const pairDiv = document.getElementById("pair");
+const submitBtn = document.getElementById("submit");
+const numberInput = document.getElementById("number");
+const waiting = document.getElementById("waiting-message");
+const botCountSpan = document.getElementById("connected-bots");
 
-        // Initialiser Socket.IO
-        function initSocketIO() {
-            socket = io();
-            
-            // Recevoir le pairing code
-            socket.on('pairing_code', (data) => {
-                console.log('Pairing code reçu:', data);
-                waitingMessage.style.display = "none";
-                
-                a.innerHTML = `
-                    <div class="code-display pulse" id="code-display" onclick="copyCode()">
-                        <i class="fas fa-copy" style="color:var(--secondary);"></i>
-                        <span class="code-text">CODE:</span>
-                        <span class="code-value" id="copy-value">${data.code}</span>
-                    </div>
-                    <p style="text-align:center; margin-top:10px; color:rgba(255,255,255,0.6);">
-                        <i class="fas fa-clock"></i> Code valable 2 minutes
-                    </p>
-                `;
-                
-                // Stocker le code brut
-                document.getElementById('copy-value').dataset.rawCode = data.rawCode;
-            });
-            
-            // Connexion réussie
-            socket.on('connection_success', (data) => {
-                a.innerHTML = `
-                    <div style="background:rgba(0,255,0,0.1); padding:15px; border-radius:12px; border:1px solid rgba(0,255,0,0.3); text-align:center;">
-                        <i class="fas fa-check-circle" style="color:#00ff00; font-size:24px; margin-bottom:10px;"></i>
-                        <div style="font-weight:600;">✅ Bot connecté avec succès!</div>
-                        <div style="margin-top:5px; font-size:14px;">Numéro: ${data.number}</div>
-                    </div>
-                `;
-            });
-            
-            // Erreurs
-            socket.on('pairing_error', (data) => {
-                waitingMessage.style.display = "none";
-                a.innerHTML = `
-                    <div style="color:var(--accent); background:rgba(255,42,109,0.1); padding:15px; border-radius:12px; border:1px solid rgba(255,42,109,0.3);">
-                        <i class="fas fa-exclamation-triangle"></i> ${data.error}
-                    </div>
-                `;
-            });
-        }
+submitBtn.addEventListener("click", async () => {
+    const number = numberInput.value.trim();
+    if(!number) return alert("Entrez votre numéro !");
+    waiting.style.display = "flex";
+    pairDiv.innerHTML = "";
 
-        // Copier le code
-        async function copyCode() {
-            const codeElement = document.getElementById('copy-value');
-            const rawCode = codeElement.dataset.rawCode || codeElement.textContent.replace(/\s+/g, '');
-            
-            try {
-                await navigator.clipboard.writeText(rawCode);
-                
-                // Animation de confirmation
-                codeElement.innerHTML = '<i class="fas fa-check" style="color:#00ff00; margin-right:8px;"></i> COPIÉ!';
-                codeElement.parentElement.style.background = 'rgba(0, 255, 0, 0.1)';
-                codeElement.parentElement.style.border = '1px solid rgba(0, 255, 0, 0.3)';
-                
-                setTimeout(() => {
-                    codeElement.innerHTML = rawCode;
-                    codeElement.parentElement.style.background = '';
-                    codeElement.parentElement.style.border = '';
-                }, 2000);
-            } catch (err) {
-                console.error('Erreur copie:', err);
-            }
-        }
+    const socketId = socket.id;
+    try {
+        await axios.post("/api/connect", { number, socketId });
+        socket.emit("join_session", socketId);
+    } catch(err) {
+        waiting.style.display = "none";
+        pairDiv.innerHTML = `<p style="color:red;">❌ Erreur de connexion au serveur</p>`;
+    }
+});
 
-        // Gestion du clic
-        b.addEventListener("click", async (e) => {
-            e.preventDefault();
-            
-            if (!c.value.trim()) {
-                a.innerHTML = '<div style="color:var(--accent); background:rgba(255,42,109,0.1); padding:10px; border-radius:8px; border:1px solid rgba(255,42,109,0.3)"><i class="fas fa-exclamation-circle"></i> Entrez votre numéro WhatsApp.</div>';
-                return;
-            }
-            
-            // Formatage du numéro
-            const cleanNumber = c.value.replace(/\D/g, '');
-            if (cleanNumber.length < 11) {
-                a.innerHTML = '<div style="color:var(--accent); background:rgba(255,42,109,0.1); padding:10px; border-radius:8px; border:1px solid rgba(255,42,109,0.3)"><i class="fas fa-times"></i> Numéro invalide</div>';
-                return;
-            }
-            
-            // Afficher le spinner
-            waitingMessage.style.display = "block";
-            a.innerHTML = '';
-            
-            try {
-                // Méthode 1: API simple (compatible avec ton code original)
-                const response = await axios.get(`/code?number=${cleanNumber}`);
-                const code = response.data.code;
-                
-                waitingMessage.style.display = "none";
-                
-                a.innerHTML = `
-                    <div class="code-display pulse" id="code-display" onclick="copyCode()">
-                        <i class="fas fa-copy" style="color:var(--secondary);"></i>
-                        <span class="code-text">CODE:</span>
-                        <span class="code-value" id="copy-value">${code}</span>
-                    </div>
-                    <p style="text-align:center; margin-top:10px; color:rgba(255,255,255,0.6);">
-                        <i class="fas fa-clock"></i> Code valable 2 minutes
-                    </p>
-                `;
-                
-                // Méthode 2: Socket.IO en parallèle
-                const formattedNumber = `+${cleanNumber}`;
-                const socketResponse = await axios.post('/api/connect', {
-                    number: formattedNumber
-                });
-                
-                currentSocketId = socketResponse.data.socketId;
-                if (socket && currentSocketId) {
-                    socket.emit('join_session', currentSocketId);
-                }
-                
-            } catch (error) {
-                console.error('Erreur:', error);
-                waitingMessage.style.display = "none";
-                a.innerHTML = '<div style="color:var(--accent); background:rgba(255,42,109,0.1); padding:10px; border-radius:8px; border:1px solid rgba(255,42,109,0.3)"><i class="fas fa-exclamation-triangle"></i> Erreur de génération</div>';
-            }
-        });
+// Affichage pairing code
+socket.on("pairing_code", (data) => {
+    waiting.style.display = "none";
+    pairDiv.innerHTML = `
+        <div style="padding:15px; border-radius:12px; border:1px solid rgba(0,247,255,0.3); background: rgba(0,247,255,0.1);">
+            <i class="fas fa-key" style="color: var(--secondary); margin-right:5px;"></i>
+            <strong>CODE:</strong> ${data.code}
+        </div>
+        <p style="font-size:0.8rem; color:rgba(255,255,255,0.6); margin-top:5px;">Valable 2 minutes</p>
+    `;
+});
 
-        // Initialiser au chargement
-        document.addEventListener('DOMContentLoaded', () => {
-            initSocketIO();
-            
-            // Auto-focus sur l'input
-            c.focus();
-            c.select();
-            
-            // Entrée = clic
-            c.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') b.click();
-            });
-            
-            // Auto-format
-            c.addEventListener('input', (e) => {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value && !value.startsWith('+')) {
-                    e.target.value = '+' + value;
-                }
-            });
-        });
-    </script>
+// Affichage connexion réussie
+socket.on("connection_success", (data) => {
+    pairDiv.innerHTML += `<p style="color:#0f0; font-weight:600; margin-top:10px;">✅ Connecté: ${data.number}</p>`;
+});
+
+// Affichage nombre de bots connectés
+socket.on("bots_update", (count) => {
+    botCountSpan.textContent = count;
+});
+</script>
+
 </body>
 </html>
